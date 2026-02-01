@@ -1,83 +1,275 @@
-# TODO - brakujace funkcje (wg `plan.md` + aktualny stan repo)
+# PROJECT_TODO.md - Volleyball Tournament Management System
 
-Ponizej lista rzeczy, ktore nadal sa **niezaimplementowane** lub sa tylko w wersji demo, oraz proponowana kolejnosc prac (od najwazniejszych dla uzytecznosci).
+## Completed Features
 
-## 0) Status "zrobione" (dla kontekstu)
-- [x] Full-stack dev: Vite (5173) + Express/Socket.io (5174)
-- [x] SQLite + Drizzle + migracje
-- [x] Spojny system stylow CSS (dark theme, admin.css)
-- [x] Usunieto mecze demo - wszystkie mecze sa czescia drabinki
-- [x] Widoki: `/admin`, `/display/fan`, `/overlay` (podstawowe)
-- [x] Toast notifications dla bledow/sukcesu
-- [x] Reconnect + state sync (automatyczne odswiezanie po reconnect)
-- [x] Mecz o 3. miejsce (auto-tworzony po zakonczeniu polfinaow)
-- [x] Scoring z setami (auto-detekcja wygranego seta, tie-break)
+### Phase 1: Project Setup
+- [x] Create repository and initial project structure
+- [x] Set up Vite + React + TypeScript frontend
+- [x] Set up Express + Socket.io backend
+- [x] Configure TypeScript for both frontend and backend
+- [x] Set up development environment (concurrent servers)
+- [x] Create database schema and migrations
+- [x] Set up monorepo scripts (concurrent dev server)
 
-## 1) Braki krytyczne - zeby to bylo "turniejowe", nie demo
-### Turniej / druzyny / zawodnicy (CRUD)
-- [x] Socket.io: dodac `team:*` eventy (create/update/delete/list)
-- [x] Backend: TeamService - update/delete + walidacja Zod
-- [ ] Backend: PlayerService (CRUD) + eventy
-- [x] Frontend: Teams Manager (`/admin/teams`) - lista + dodawanie/edycja/usuwanie
+### Phase 2: Core Backend Services
+- [x] Team service (CRUD with Zod validation)
+- [x] Bracket service (generation with byes, match wiring)
+- [x] Match service (start/end/reset, score management)
+- [x] Socket.io event handlers (match, bracket, team events)
+- [x] Third place match auto-creation after semifinals
+- [x] Volleyball scoring with sets (auto-detect 25pt/2-point advantage, tie-break to 15)
 
-### Drabinka single-elimination + 3. miejsce
-- [x] Backend: BracketService
-  - [x] generowanie drabinki z N druzyn (byes do potegi 2)
-  - [x] modelowanie `nextMatchId` i propagacja zwyciezcy
-  - [x] automatyczne utworzenie meczu o 3. miejsce (po zakonczeniu polfinaow)
-- [x] Socket.io: `bracket:*` eventy (`bracket:updated`, `admin:bracket:assign`, `admin:bracket:swap`)
-- [x] Frontend: Bracket Editor (`/admin/bracket`) - manualne przypisania (na start: forma bez drag&drop)
-- [x] Frontend: Bracket Display (`/display/bracket`) - widok tylko do odczytu
+### Phase 3: Shared Infrastructure
+- [x] Socket.io React context with reconnect handling
+- [x] Zustand stores with Socket.io sync
+- [x] React Router v7 setup with all routes
+- [x] Toast notification system (Toast.tsx context)
+- [x] Automatic state refresh on reconnect
 
-### Mecze (pelna funkcjonalnosc)
-- [x] Backend: MatchService - start/end/reset, wybor zwyciezcy, aktualizacja statusu `pending/live/completed`
-- [x] Socket.io: `admin:match:start`, `admin:match:end`, `admin:match:reset`
-- [x] Frontend: Match Control (`/admin/match/:id`) - pelnoekranowa kontrola meczu
+### Phase 4: Admin Interface
+- [x] Admin Dashboard page (/admin)
+  - [x] Tournament overview with workflow steps
+  - [x] Quick stats cards
+  - [x] Current/next match preview
+  - [x] Navigation to all admin pages
+- [x] Teams Manager page (/admin/teams)
+  - [x] Team list with edit/delete
+  - [x] Add new team form
+  - [x] Inline color picker
+  - [x] Real-time updates
+- [x] Bracket Editor page (/admin/bracket)
+  - [x] Visual bracket display with sets support
+  - [x] Manual team assignment
+  - [x] Bye slot handling
+  - [x] 3rd place match display
+  - [x] Match status controls (start/end/reset)
+- [x] Match Control page (/admin/match/:id)
+  - [x] Large score display with sets
+  - [x] Increment/decrement buttons (A/Q, L/P keyboard shortcuts)
+  - [x] Set management (award set, undo set)
+  - [x] End match / advance winner controls
 
-## 2) Scoring (zgodnie z planem)
-- [x] `scoring.service.ts` - tryby:
-  - [x] `points` (proste punkty)
-  - [x] `sets` (sety + punkty, warunek przewagi 2 punktow, tie-break do 15)
-  - [ ] `timed` (czas, overtime/"golden")
-- [ ] Persist scoring config per round (np. w `tournaments.settings` albo osobnej tabeli)
-- [ ] UI: konfiguracja scoringu w kreatorze turnieju
+### Phase 5: Display Views
+- [x] Fan View (/display/fan)
+  - [x] Large score display
+  - [x] Sets score prominently displayed
+  - [x] Set history with individual set scores
+  - [x] Auto-refresh on match change
+  - [x] Live indicator
+- [x] Bracket Display (/display/bracket)
+  - [x] Complete bracket visualization
+  - [x] Live result updates
+  - [x] Winner highlighting
+  - [x] 3rd place match display
+- [x] NotFound page for invalid routes
 
-## 3) Widoki i overlay (feature-complete)
-- [x] Fan view: sety + historia setow
-- [ ] Fan view: "nastepny mecz" info
-- [ ] Player view (`/display/player`) - "gracie nastepni" + pozycja w drabince
-- [x] Overlay: ScoreBar z setami
-- [ ] Overlay: animacje zmian wynikow
-- [ ] Overlay: Info rotator (nastepny mecz / mini-drabinka / komunikaty)
-- [ ] Overlay config (`/overlay/config`): pozycje/kolory/widocznosc/tempo rotacji
+### Phase 6: OBS Streaming Overlay
+- [x] Overlay page (/overlay) with transparent background
+- [x] Score bar component
+  - [x] Team names with colors
+  - [x] Sets score display
+  - [x] Current points display
+  - [x] Score change animations (pop effect with glow)
+- [x] Transparent background toggle (?transparent=false)
 
-## 4) Stabilnosc realtime i wspolbieznosc
-- [x] Reconnect + state sync: po reconnect wysylac snapshot (`tournament:state`) i re-join rooms
-- [ ] Konflikty wielu adminow:
-  - [ ] wskazniki "kto edytuje" (soft-lock lub presence)
-  - [ ] optimistic UI tylko tam gdzie ma sens
-- [x] Obsluga bledow i UX: toasty/komunikaty
-
-## 5) Jakosc i "polish"
-- [x] Keyboard shortcuts (np. A/L - punkt dla lewej/prawej)
-- [ ] Undo/redo (co najmniej dla scoringu)
-- [ ] Mobile-responsive admin
-- [ ] Cross-browser + test na wielu urzadzeniach LAN
-
-## 6) Produkcja i dokumentacja
-- [ ] Produkcyjny build/serve (frontend z backendu) + instrukcja uruchomienia na LAN
-- [ ] Dokumentacja uzytkowa po polsku + "getting started"
-- [ ] Test "portable" (USB) - sciezki wzgledne do DB, brak zaleznosci od internetu
+### Phase 7: UI Styling & Polish
+- [x] Comprehensive CSS design system (admin.css)
+  - [x] Dark theme with CSS variables
+  - [x] Consistent button styles (primary, secondary, success, danger)
+  - [x] Card layouts and form elements
+  - [x] Status badges with animations
+  - [x] Sets display styling
+  - [x] Toast notification styling
+- [x] Keyboard shortcuts for score control (A/Q, L/P)
+- [x] Toast notifications for all user actions
+- [x] Connection status indicators
 
 ---
 
-# Plan prac (co robię teraz)
-1. Usunieto mecze demo - wszystkie mecze sa czescia turnieju
-2. Przepracowano Dashboard z workflow i nawigacja
-3. Dodano spojny system stylow (admin.css)
-4. Mecz o 3. miejsce auto-tworzony po polfinaach
-5. Toast notifications
-6. Reconnect + state sync
-7. Scoring z setami (auto-detekcja wygranego seta)
-8. Fan view i overlay wyswietlaja sety
-9. Kolejne kroki: overlay animations, player view, timed scoring
+## In Progress / Next Priority
+
+### Remaining Work (High Priority)
+
+#### 1. Backend Services
+- [ ] Tournament service (create, update, delete, list with full CRUD)
+- [ ] Player service (CRUD + team assignment)
+- [ ] Scoring service (pluggable modes, persist config per tournament)
+- [ ] Scoring modes:
+  - [x] Points (simple increment)
+  - [x] Sets (with auto-win, tie-break)
+  - [ ] Timed (match timer, overtime, golden set)
+
+#### 2. Admin Features
+- [ ] Tournament setup wizard / creation flow
+  - [ ] Basic tournament info (name, date, etc.)
+  - [ ] Scoring mode configuration
+  - [ ] Team import (CSV/JSON)
+  - [ ] Bracket generation/import
+- [ ] Player management per team
+- [ ] Set management improvements:
+  - [ ] Manual set score input
+  - [ ] Set duration tracking
+  - [ ] Highlight current set
+- [ ] Undo/redo for admin actions
+- [ ] Protective confirmations for destructive / non-normal admin actions
+  - [ ] Confirmation modal for editing a **completed** match (edit, reset, change winner)
+  - [ ] Confirmation for forcing / manually setting a **match winner**
+  - [ ] Confirmation for deleting **match/team/tournament**
+  - [ ] Confirmation when importing a bracket that will **overwrite** existing assignments
+  - [ ] Confirmation for bulk destructive operations (reset tournament, clear all matches)
+  - [ ] UX: add "I understand" checkbox or typed confirmation option for very dangerous actions
+  - [ ] Add admin preference to opt-out of confirmations (conservative default = enabled)
+  - [ ] Add audit logging and toast notifications for confirmed actions
+
+#### 3. Display Views
+- [ ] Fan View enhancements:
+  - [ ] Next match preview
+  - [ ] Match schedule/history
+  - [ ] Current status info
+- [ ] Player Info View (/display/player)
+  - [ ] Current match status
+  - [ ] "You're playing next" indicator
+  - [ ] Team roster
+  - [ ] Bracket position
+- [ ] Real-time live-sync between views
+
+#### 4. OBS Overlay Enhancements
+- [ ] Info rotator component
+  - [ ] Next match preview rotation
+  - [ ] Mini bracket view
+  - [ ] Tournament progress
+  - [ ] Custom admin messages
+- [ ] Celebration animations
+  - [ ] Set win effect
+  - [ ] Match win effect
+  - [ ] Tournament winner celebration
+- [ ] Overlay configuration page (/overlay/config)
+  - [ ] Position adjustments
+  - [ ] Color/theme overrides
+  - [ ] Component visibility toggles
+  - [ ] Rotation timing
+  - [ ] Animation speed controls
+
+#### 5. Stability & Reliability
+- [ ] Multi-admin conflict resolution
+  - [ ] "Typing/editing" indicators (presence)
+  - [ ] Soft-lock for exclusive editing
+  - [ ] Optimistic UI updates
+- [ ] Comprehensive error handling
+  - [ ] Network errors with recovery UI
+  - [ ] Database errors with logging
+  - [ ] Socket disconnection handling
+- [ ] Mobile-responsive admin interface
+- [ ] Cross-browser testing (Chrome, Firefox, Edge, Safari)
+
+#### 6. Production & Deployment
+- [ ] Combine frontend and backend builds
+  - [ ] Serve React build from Express
+  - [ ] Production environment variables
+  - [ ] Minified assets
+- [ ] Create production deployment guide
+- [ ] Test portable deployment (USB drive)
+  - [ ] Relative database paths
+  - [ ] No internet dependency verification
+  - [ ] Single-executable bundle (optional)
+- [ ] Write Polish documentation
+  - [ ] Installation guide
+  - [ ] Getting started tutorial
+  - [ ] Administrator manual
+  - [ ] Troubleshooting guide
+- [ ] Add helpful UI tooltips
+
+#### 7. Testing & QA
+- [ ] Unit tests for services (bracket, match, scoring)
+- [ ] Integration tests for Socket.io events
+- [ ] UI component tests (React Testing Library)
+- [ ] LAN network testing with multiple devices
+- [ ] Load testing (concurrent users)
+- [ ] Connection loss / reconnect scenarios
+- [ ] Data persistence verification
+
+---
+
+## Implementation Phases (from plan.md, mapped to above)
+
+### Phase 2: Core Backend
+- Implement database models and services
+  - [x] Team service (CRUD)
+  - [ ] Tournament service (CRUD)
+  - [ ] Player service (CRUD)
+  - [x] Bracket service (generation, updates)
+  - [x] Match service (CRUD, score management)
+  - [ ] Scoring service (pluggable scoring modes)
+- Implement Socket.io event handlers
+  - [ ] Tournament events
+  - [x] Match events (score updates, status)
+  - [x] Bracket events
+  - [x] Team events
+- [ ] Add conflict resolution for concurrent edits
+
+### Phase 3: Shared Infrastructure
+- [x] Create Socket.io React context and hooks
+- [x] Implement Zustand stores with Socket.io sync
+- [ ] Build base UI component library
+  - [ ] Button, Input, Select, Modal (enhance existing)
+  - [ ] Card, Badge, Tabs (enhance existing)
+  - [ ] Loading states, error boundaries
+- [x] Set up React Router with route structure
+
+### Phase 4: Admin Interface
+- [x] Admin Dashboard page
+- [ ] Tournament Setup wizard
+- [x] Bracket Editor page
+- [x] Match Control page
+- [x] Teams Manager page
+
+### Phase 5: Display Views
+- [x] Fan View (basic with sets)
+  - [ ] Set history (done)
+  - [ ] Next match preview
+- [ ] Player Info View
+- [x] Bracket Display
+
+### Phase 6: OBS Streaming Overlay
+- [x] Overlay page with transparent background
+- [ ] Score bar component (basic done, animations done)
+- [ ] Info rotator component
+- [ ] Celebration animations
+- [ ] Overlay configuration page
+
+### Phase 7: Polish & Testing
+- [x] Add keyboard shortcuts for score control
+- [ ] Implement undo/redo for admin actions
+- [ ] Add sound effects (optional, configurable)
+- [x] Comprehensive error handling (partial)
+- [x] Connection loss handling (reconnect + state sync)
+- [ ] Mobile-responsive admin interface
+- [ ] Cross-browser testing
+
+### Phase 8: Documentation & Deployment
+- [ ] Write usage documentation (Polish)
+- [ ] Create "getting started" guide
+- [ ] Add helpful tooltips in UI
+- [ ] Create production build scripts
+- [ ] Test portable deployment (USB drive scenario)
+
+---
+
+## Current Session Work (Feb 1, 2026)
+
+Completed:
+1. ✅ 3rd place match auto-creation after semifinals
+2. ✅ Toast notifications system
+3. ✅ Reconnect + state sync
+4. ✅ Volleyball sets scoring (auto-detect, tie-break)
+5. ✅ Fan view with sets display
+6. ✅ Overlay score animations
+7. ✅ Unified TODO documentation
+
+Next priorities:
+- Player service (CRUD)
+- Tournament CRUD operations
+- Timed scoring mode
+- Player view (/display/player)
+- Overlay info rotator
+- Production build setup

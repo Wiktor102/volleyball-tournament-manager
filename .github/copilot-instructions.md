@@ -1,13 +1,12 @@
 # Copilot instructions for this repository
 
 ## Project status
-- This repo currently contains **`plan.md` only** (an implementation plan/design doc). There is **no application code yet**, so build/test/lint commands are not available.
-- Use `plan.md` as the source of truth for intended stack, architecture, and conventions until code lands.
+- This repository contains the project plan, a current task list, and application source code and configuration. Use `PROJECT_TODO.md` for the up-to-date task list and `plan.md` for architecture and conventions.
+- The repository is actively developed; check `package.json`, `server/`, and `src/` for the current build/test/lint configuration.
 
 ## Build, test, lint
-- **Not configured yet** (no `package.json`, `Makefile`, `pyproject.toml`, etc.).
-- When code is added, prefer documenting commands in `package.json` scripts (expected tooling per `plan.md`: Vite, TypeScript, React, Express, Drizzle).
-- If you introduce a test runner, also document how to run a *single test* (e.g., a single Vitest file) in this file.
+- Check `package.json` for available scripts and toolchain configuration. If scripts are not present, see `PROJECT_TODO.md` for current tasks and `plan.md` for the intended stack (Vite, TypeScript, React, Express, Drizzle).
+- When adding tooling, document convenient scripts (start, dev, build, test, lint) in `package.json` and include a note for running a single test when applicable.
 
 ## High-level architecture (intended; from `plan.md`)
 

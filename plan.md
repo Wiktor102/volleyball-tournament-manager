@@ -587,145 +587,64 @@ When multiple admins edit simultaneously:
 - Import bracket layout from JSON
 - Export tournament results to CSV/JSON
 
----
-
-## Workplan
-
-### Phase 1: Project Foundation
-- [x] Initialize Node.js project with TypeScript
-- [x] Set up Vite + React + TypeScript frontend
-- [ ] Configure Tailwind CSS with custom theme
-- [x] Set up Express server with Socket.io
-- [x] Configure SQLite with Drizzle ORM
-- [x] Create database schema and migrations
-- [x] Set up monorepo scripts (concurrent dev server)
-
-### Phase 2: Core Backend
-- [ ] Implement database models and services
-  - [ ] Tournament service (CRUD)
-  - [x] Team service (CRUD)
-  - [ ] Player service (CRUD)
-  - [x] Bracket service (generation, updates)
-  - [x] Match service (CRUD, score management)
-  - [ ] Scoring service (pluggable scoring modes)
-- [ ] Implement Socket.io event handlers
-  - [ ] Tournament events
-  - [ ] Match events (score updates, status)
-  - [x] Bracket events
-  - [x] Team events
-- [ ] Add conflict resolution for concurrent edits
-
-### Phase 3: Shared Infrastructure
-- [x] Create Socket.io React context and hooks
-- [x] Implement Zustand stores with Socket.io sync
-- [ ] Build base UI component library
-  - [ ] Button, Input, Select, Modal
-  - [ ] Card, Badge, Tabs
-  - [ ] Loading states, error boundaries
-- [x] Set up React Router with route structure
-
-### Phase 4: Admin Interface
-- [ ] Admin Dashboard page
-  - [ ] Tournament overview
-  - [ ] Quick actions panel
-  - [ ] Current/next match preview
-- [ ] Tournament Setup wizard
-  - [ ] Basic info form
-  - [ ] Scoring mode configuration
-  - [ ] Team management (add/edit/remove)
-  - [ ] Team import (CSV/JSON)
-- [ ] Bracket Editor page
-  - [ ] Visual bracket display
-  - [ ] Manual team assignment
-  - [ ] Drag-and-drop support
-  - [ ] Bye slot handling
-- [x] Match Control page
-  - [x] Large score display
-  - [x] Increment/decrement buttons
-  - [ ] Set management
-  - [ ] Timer controls (for timed mode)
-  - [ ] Undo functionality
-  - [x] End match / advance winner
-- [x] Teams Manager page
-  - [x] Team list with edit/delete
-  - [ ] Player management per team
-  - [x] Team color picker
-
-### Phase 5: Display Views
-- [ ] Fan View (big screen display)
-  - [x] Large score display
-  - [ ] Set history
-  - [ ] Next match preview
-  - [x] Auto-refresh on match change
-- [ ] Player Info View
-  - [ ] Current match status
-  - [ ] "You're playing next" indicator
-  - [ ] Bracket position
-- [x] Bracket Display (full-screen)
-  - [x] Complete bracket visualization
-  - [x] Live result updates
-  - [x] Winner highlighting
-
-### Phase 6: OBS Streaming Overlay
-- [x] Overlay page with transparent background
-- [ ] Score bar component
-  - [ ] Team names with colors
-  - [ ] Set score
-  - [ ] Current points
-  - [ ] Score change animations
-- [ ] Info rotator component
-  - [ ] Next match preview
-  - [ ] Mini bracket view
-  - [ ] Tournament progress
-  - [ ] Custom messages (admin-configurable)
-- [ ] Celebration animations
-  - [ ] Set win effect
-  - [ ] Match win effect
-  - [ ] Tournament winner celebration
-- [ ] Overlay configuration page
-  - [ ] Position adjustments
-  - [ ] Color/theme overrides
-  - [ ] Component visibility toggles
-  - [ ] Rotation timing
-
-### Phase 7: Polish & Testing
-- [ ] Add keyboard shortcuts for score control
-- [ ] Implement undo/redo for admin actions
-- [ ] Add sound effects (optional, configurable)
-- [ ] Comprehensive error handling
-- [ ] Connection loss handling (reconnect + state sync)
-- [ ] Mobile-responsive admin interface
-- [ ] Cross-browser testing (Chrome, Firefox, Edge)
-- [ ] LAN network testing with multiple devices
-
-### Phase 8: Documentation & Deployment
-- [ ] Write usage documentation (Polish)
-- [ ] Create "getting started" guide
-- [ ] Add helpful tooltips in UI
-- [ ] Create production build scripts
-- [ ] Test portable deployment (USB drive scenario)
+### Admin protections & confirmations
+- The system is intentionally flexible and allows admins to edit nearly any state; sensitive, non-normal, or destructive changes should be protected by explicit confirmation dialogs rather than removed.
+- Typical guarded actions:
+  - Editing a **completed** match (changing sets, points, winner, or resetting the match)
+  - Forcing or manually setting a **match winner**
+  - Deleting a **match**, **team**, or **tournament**
+  - Overwriting the current bracket via **import** or bulk operations
+  - Swapping teams in a match that has already completed or been finalized
+  - Resetting the entire tournament state or running batch destructive operations
+- UX guidance:
+  - Use a clear modal with **title**, a short **explanation of impact**, and an **explicit confirmation action** (e.g., “Tak, potwierdzę zmianę” / “Yes, I confirm”). For these boxes **don't** include keyboard shortcuts.
+  - Optionally allow an admin-level **preference** to reduce confirmations for trusted users, but keep a conservative default (confirmations ON).
+  - Emit an audit-style toast and server-side log entry for protected actions (who, what, when) to help troubleshooting and rollbacks.
 
 ---
 
-## Technical Considerations
+## Implementation Status
 
-### Offline/LAN Resilience
-- SQLite database ensures data persists locally
-- No external dependencies required after install
-- Frontend served from same server (no CORS issues)
-- Automatic reconnection on network hiccups
+**For detailed task tracking, see [`PROJECT_TODO.md`](./PROJECT_TODO.md)** - all work phases, completed features, and remaining tasks are documented there.
 
-### Performance
-- Socket.io rooms limit unnecessary broadcasts
-- Database queries optimized with indexes
-- Frontend uses React.memo for expensive renders
-- Animations use GPU-accelerated CSS transforms
+This section provides an overview of the implementation phases. Detailed TODO items with checkboxes should be maintained in `PROJECT_TODO.md` only.
 
-### Extensibility Points
-- Scoring modes implemented as strategy pattern (easy to add new modes)
-- UI components are composable and reusable
-- Socket events follow consistent naming convention
-- Database schema allows for future features (statistics, history)
+### High-Level Phases Overview
+
+1. **Phase 1: Project Foundation** ✅ Complete
+   - Repository, Vite, Express, Socket.io, SQLite, Drizzle setup
+   - Development environment configured
+
+2. **Phase 2: Core Backend** 🔄 In Progress
+   - Team service ✅ | Bracket service ✅ | Match service ✅
+   - Tournament service ❌ | Player service ❌
+   - Scoring service (sets mode ✅, timed mode ❌)
+
+3. **Phase 3: Shared Infrastructure** ✅ Mostly Complete
+   - Socket.io context with reconnect ✅
+   - Zustand stores ✅
+   - React Router ✅
+   - Toast notifications ✅
+
+4. **Phase 4: Admin Interface** ✅ Core Complete
+   - Dashboard ✅ | Teams Manager ✅ | Bracket Editor ✅ | Match Control ✅
+   - Tournament setup wizard ❌ | Player management ❌
+
+5. **Phase 5: Display Views** 🔄 In Progress
+   - Fan View ✅ (with sets, needs next-match preview)
+   - Bracket Display ✅
+   - Player View ❌
+
+6. **Phase 6: OBS Overlay** 🔄 In Progress
+   - Score bar with animations ✅
+   - Info rotator ❌ | Celebration animations ❌ | Configuration page ❌
+
+7. **Phase 7: Polish & Testing** 🔄 In Progress
+   - Keyboard shortcuts ✅ | Toast notifications ✅
+   - Undo/redo ❌ | Mobile responsive ❌ | Cross-browser testing ❌
+
+8. **Phase 8: Production & Documentation** ❌ Not Started
+   - Combined build ❌ | Polish documentation ❌ | Deployment guide ❌
 
 ---
 
