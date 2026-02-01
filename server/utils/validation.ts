@@ -33,6 +33,28 @@ export const DeleteTeamSchema = z.object({
   teamId: z.string().min(1),
 })
 
+// Player schemas
+export const ListPlayersSchema = z.object({
+  teamId: z.string().min(1),
+})
+
+export const CreatePlayerSchema = z.object({
+  teamId: z.string().min(1),
+  name: z.string().min(1),
+})
+
+export const UpdatePlayerSchema = z.object({
+  playerId: z.string().min(1),
+  patch: z.object({
+    name: z.string().min(1).optional(),
+  }).strict(),
+})
+
+export const DeletePlayerSchema = z.object({
+  playerId: z.string().min(1),
+  teamId: z.string().min(1).optional(), // For broadcast
+})
+
 export const ScoreIncrementSchema = z.object({
   matchId: z.string().min(1),
   team: z.enum(['team1', 'team2']),

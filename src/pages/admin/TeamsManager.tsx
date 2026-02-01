@@ -8,8 +8,13 @@ import "../../styles/admin.css";
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string };
 
 type TeamDraft = { name: string; shortName: string; color: string };
-
 type Drafts = Record<string, TeamDraft>;
+
+type Player = {
+	id: string;
+	teamId: string;
+	name: string;
+};
 
 const randomColor = () => {
 	const c = Math.floor(Math.random() * 0xffffff).toString(16);
@@ -27,6 +32,12 @@ export function TeamsManager() {
 
 	const [drafts, setDrafts] = useState<Drafts>({});
 	const [editingId, setEditingId] = useState<string | null>(null);
+
+	// Player management state
+	const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+	const [players, setPlayers] = useState<Record<string, Player[]>>({});
+	const [newPlayerName, setNewPlayerName] = useState("");
+	const [loadingPlayers, setLoadingPlayers] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!socket) return;
@@ -51,8 +62,35 @@ export function TeamsManager() {
 
 		socket.on("tournament:state", onState);
 
+		// Player events
+		const onPlayerCreated = (p: Player) => {
+			setPlayers(prev => ({
+				...prev,
+				[p.teamId]: [...(prev[p.teamId] ?? []), p]
+			}));
+		};
+		const onPlayerUpdated = (p: Player) => {
+			setPlayers(prev => ({
+				...prev,
+				[p.teamId]: (prev[p.teamId] ?? []).map(x => x.id === p.id ? p : x)
+			}));
+		};
+		const onPlayerDeleted = ({ playerId, teamId }: { playerId: string; teamId: string }) => {
+			setPlayers(prev => ({
+				...prev,
+				[teamId]: (prev[teamId] ?? []).filter(x => x.id !== playerId)
+			}));
+		};
+
+		socket.on("player:created", onPlayerCreated);
+		socket.on("player:updated", onPlayerUpdated);
+		socket.on("player:deleted", onPlayerDeleted);
+
 		return () => {
 			socket.off("tournament:state", onState);
+			socket.off("player:created", onPlayerCreated);
+			socket.off("player:updated", onPlayerUpdated);
+			socket.off("player:deleted", onPlayerDeleted);
 		};
 	}, [socket, setTournament, setTeams]);
 
@@ -106,6 +144,44 @@ export function TeamsManager() {
 			[teamId]: { name: team.name, shortName: team.shortName ?? "", color: team.color ?? randomColor() }
 		}));
 		setEditingId(null);
+	};
+
+	// Player management functions
+	const togglePlayers = (teamId: string) => {
+		if (expandedTeamId === teamId) {
+			setExpandedTeamId(null);
+			return;
+		}
+		setExpandedTeamId(teamId);
+		
+		// Load players if not already loaded
+		if (!players[teamId] && socket) {
+			setLoadingPlayers(teamId);
+			socket.emit("player:list", { teamId }, (ack: Ack<Player[]>) => {
+				setLoadingPlayers(null);
+				if (ack.ok) {
+					setPlayers(prev => ({ ...prev, [teamId]: ack.data }));
+				}
+			});
+		}
+	};
+
+	const addPlayer = (teamId: string) => {
+		if (!socket || !newPlayerName.trim()) return;
+		socket.emit("admin:player:create", { teamId, name: newPlayerName.trim() }, (ack: Ack<Player>) => {
+			if (!ack.ok) {
+				addToast(ack.error, "error");
+				return;
+			}
+			setNewPlayerName("");
+			addToast(`Zawodnik "${ack.data.name}" dodany`, "success");
+		});
+	};
+
+	const removePlayer = (playerId: string, teamId: string) => {
+		if (!socket) return;
+		socket.emit("admin:player:delete", { playerId, teamId });
+		addToast("Zawodnik usunięty", "info");
 	};
 
 	return (
@@ -284,6 +360,12 @@ export function TeamsManager() {
 												<div className="btn-group">
 													<button
 														className="btn btn-secondary btn-sm"
+														onClick={() => togglePlayers(t.id)}
+													>
+														{expandedTeamId === t.id ? "Zwiń" : "Zawodnicy"}
+													</button>
+													<button
+														className="btn btn-secondary btn-sm"
 														onClick={() => setEditingId(t.id)}
 													>
 														Edytuj
@@ -292,6 +374,57 @@ export function TeamsManager() {
 														Usuń
 													</button>
 												</div>
+											</div>
+										)}
+
+										{/* Players section */}
+										{expandedTeamId === t.id && !isEditing && (
+											<div className="players-section" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+												<div className="flex items-center justify-between mb-2">
+													<strong style={{ fontSize: 14 }}>Zawodnicy</strong>
+												</div>
+												
+												{loadingPlayers === t.id ? (
+													<div className="text-muted">Ładowanie...</div>
+												) : (
+													<>
+														{(players[t.id] ?? []).length === 0 ? (
+															<div className="text-muted mb-2" style={{ fontSize: 13 }}>Brak zawodników w drużynie</div>
+														) : (
+															<ul className="player-list">
+																{(players[t.id] ?? []).map(p => (
+																	<li key={p.id} className="player-item">
+																		<span>{p.name}</span>
+																		<button
+																			className="btn btn-danger btn-xs"
+																			onClick={() => removePlayer(p.id, t.id)}
+																		>
+																			×
+																		</button>
+																	</li>
+																))}
+															</ul>
+														)}
+														
+														<div className="form-row" style={{ marginTop: 8 }}>
+															<input
+																className="form-input form-input-sm"
+																placeholder="Imię zawodnika"
+																value={expandedTeamId === t.id ? newPlayerName : ""}
+																onChange={e => setNewPlayerName(e.target.value)}
+																onKeyDown={e => e.key === "Enter" && addPlayer(t.id)}
+																style={{ flex: 1 }}
+															/>
+															<button
+																className="btn btn-primary btn-sm"
+																onClick={() => addPlayer(t.id)}
+																disabled={!newPlayerName.trim()}
+															>
+																Dodaj
+															</button>
+														</div>
+													</>
+												)}
 											</div>
 										)}
 									</div>

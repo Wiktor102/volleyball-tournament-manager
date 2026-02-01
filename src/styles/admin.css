@@ -381,6 +381,41 @@
   color: var(--color-text-dim);
 }
 
+/* Player list inside team */
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.player-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 12px;
+  min-width: auto;
+}
+
+.form-input-sm {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
 /* Match Card */
 .match-card {
   background: var(--color-bg);
