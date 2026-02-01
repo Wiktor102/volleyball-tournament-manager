@@ -224,7 +224,8 @@ export function BracketEditor() {
                         </div>
                       ) : null}
 
-                      <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                        <Link to={`/admin/match/${m.id}`}>Kontrola</Link>
                         {m.status === 'pending' && m.team1Id && m.team2Id ? <button onClick={() => start(m.id)}>Start</button> : null}
 
                         {m.status === 'live' ? (
