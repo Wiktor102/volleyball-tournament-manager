@@ -1,9 +1,0 @@
-- generic [ref=e3]:
-  - heading "Panel administratora" [level=1] [ref=e4]
-  - generic [ref=e5]: "Socket: rozłączono"
-  - generic [ref=e6]:
-    - heading "Turniej" [level=2] [ref=e7]
-    - generic [ref=e8]: Ładowanie…
-  - generic [ref=e9]:
-    - heading "Mecz" [level=2] [ref=e10]
-    - generic [ref=e11]: Brak aktywnego meczu (utwórz demo).
