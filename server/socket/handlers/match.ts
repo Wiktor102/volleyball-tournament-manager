@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io'
 import { MatchEndSchema, MatchResetSchema, MatchStartSchema, ScoreDecrementSchema, ScoreIncrementSchema } from '../../utils/validation'
 import { getTournamentState } from '../../services/state.service'
-import { createDemoMatch, decrementPoint, endMatch, ensureMatchScore, getMatchScore, incrementPoint, resetMatch, startMatch } from '../../services/match.service'
+import { decrementPoint, endMatch, ensureMatchScore, getMatchScore, incrementPoint, resetMatch, startMatch } from '../../services/match.service'
 import { listBracketMatches } from '../../services/bracket.service'
 
 export function registerMatchHandlers(io: Server, socket: Socket) {
@@ -82,24 +82,5 @@ export function registerMatchHandlers(io: Server, socket: Socket) {
     if (state) io.to(`tournament:${parsed.data.tournamentId}`).emit('tournament:state', state)
 
     return ack?.({ ok: true, data: res.match })
-  })
-
-  // Temporary helper to make the app usable quickly
-  socket.on('admin:match:demo', async (payload, ack) => {
-    const { tournamentId } = (payload ?? {}) as { tournamentId?: string }
-    if (!tournamentId) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
-
-    const m = await createDemoMatch(tournamentId)
-    if (!m) return ack?.({ ok: false, error: 'Nie udało się utworzyć meczu' })
-
-    const score = await getMatchScore(m.id)
-    socket.join(`match:${m.id}`)
-    io.to(`tournament:${tournamentId}`).emit('match:status', m)
-    if (score) io.to(`match:${m.id}`).emit('match:score', score)
-
-    const state = await getTournamentState(tournamentId)
-    if (state) io.to(`tournament:${tournamentId}`).emit('tournament:state', state)
-
-    return ack?.({ ok: true, data: { match: m, score } })
   })
 }

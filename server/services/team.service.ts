@@ -83,12 +83,3 @@ export async function deleteTeam(teamId: string): Promise<Team | null> {
   await db.delete(teams).where(eq(teams.id, teamId))
   return existing
 }
-
-export async function getOrCreateDemoTeams(tournamentId: string) {
-  const existing = await listTeams(tournamentId)
-  if (existing.length >= 2) return existing.slice(0, 2)
-
-  const a = await createTeam(tournamentId, { name: 'Drużyna 1', shortName: 'D1', color: '#FF6B35' })
-  const b = await createTeam(tournamentId, { name: 'Drużyna 2', shortName: 'D2', color: '#1E3A5F' })
-  return [a, b]
-}

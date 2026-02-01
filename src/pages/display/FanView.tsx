@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -60,25 +62,63 @@ export function FanView() {
   const team1 = teams.find((t) => t.id === team1Id)
   const team2 = teams.find((t) => t.id === team2Id)
 
-  return (
-    <div style={{ fontFamily: 'system-ui', padding: 32 }}>
-      <h1>{tournament?.name ?? 'Turniej'}</h1>
-      <div>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
+  const hasActiveMatch = !!matchId && !!team1Id && !!team2Id
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-        <div>
-          <div style={{ fontSize: 24, color: team1?.color ?? undefined }}>{team1?.name ?? 'DRUŻYNA 1'}</div>
-          <div style={{ fontSize: 120, fontWeight: 700 }}>{score?.team1CurrentPoints ?? 0}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 24, textAlign: 'right', color: team2?.color ?? undefined }}>{team2?.name ?? 'DRUŻYNA 2'}</div>
-          <div style={{ fontSize: 120, fontWeight: 700, textAlign: 'right' }}>
-            {score?.team2CurrentPoints ?? 0}
+  return (
+    <div className="display-page">
+      <div className="display-container">
+        <div className="display-header">
+          <h1>🏐 {tournament?.name ?? 'Turniej'}</h1>
+          <div className="flex items-center gap-2">
+            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
+              {connected ? 'Online' : 'Offline'}
+            </span>
+            <Link to="/display/bracket" className="btn btn-secondary btn-sm">
+              Drabinka
+            </Link>
           </div>
         </div>
-      </div>
 
-      <div style={{ marginTop: 12, opacity: 0.7 }}>Aktualny set: {score?.currentSet ?? 1}</div>
+        {hasActiveMatch ? (
+          <>
+            <div className="live-indicator mb-3" style={{ justifyContent: 'center' }}>
+              <span className="live-dot"></span>
+              <span style={{ fontSize: 18 }}>MECZ NA ŻYWO</span>
+            </div>
+
+            <div className="fan-score">
+              <div className="fan-team">
+                <div className="fan-team-name" style={{ color: team1?.color || undefined }}>
+                  {team1?.name ?? 'DRUŻYNA 1'}
+                </div>
+                <div className="fan-team-score">{score?.team1CurrentPoints ?? 0}</div>
+              </div>
+
+              <div className="fan-vs">:</div>
+
+              <div className="fan-team" style={{ textAlign: 'right' }}>
+                <div className="fan-team-name" style={{ color: team2?.color || undefined }}>
+                  {team2?.name ?? 'DRUŻYNA 2'}
+                </div>
+                <div className="fan-team-score">{score?.team2CurrentPoints ?? 0}</div>
+              </div>
+            </div>
+
+            <div className="text-center mt-3 text-muted">
+              Set {score?.currentSet ?? 1}
+            </div>
+          </>
+        ) : (
+          <div className="card">
+            <div className="empty-state">
+              <div className="empty-state-icon">🏐</div>
+              <div className="empty-state-text">
+                Brak aktywnego meczu. Poczekaj na rozpoczęcie rozgrywki.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

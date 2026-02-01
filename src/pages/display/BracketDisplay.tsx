@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -75,55 +76,88 @@ export function BracketDisplay() {
     return t.shortName ? `${t.name} (${t.shortName})` : t.name
   }
 
+  const getRoundName = (round: number, totalRounds: number) => {
+    if (round === totalRounds) return 'Finał'
+    if (round === totalRounds - 1) return 'Półfinały'
+    if (round === totalRounds - 2) return 'Ćwierćfinały'
+    return `Runda ${round}`
+  }
+
+  const totalRounds = Math.max(...rounds.map((r) => r.round), 0)
+
   return (
-    <div style={{ fontFamily: 'system-ui', padding: 32 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-        <h1 style={{ margin: 0 }}>{tournament?.name ?? 'Turniej'} – Drabinka</h1>
-        <Link to="/display/fan">Widok fanów →</Link>
-      </div>
-      <div style={{ opacity: 0.7 }}>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
+    <div className="display-page">
+      <div className="display-container">
+        <div className="display-header">
+          <h1>🏆 {tournament?.name ?? 'Turniej'} – Drabinka</h1>
+          <div className="flex items-center gap-2">
+            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
+              {connected ? 'Online' : 'Offline'}
+            </span>
+            <Link to="/display/fan" className="btn btn-secondary btn-sm">
+              Wynik na żywo
+            </Link>
+          </div>
+        </div>
 
-      {rounds.length === 0 ? (
-        <div style={{ marginTop: 16, opacity: 0.8 }}>Brak drabinki.</div>
-      ) : (
-        <div style={{ display: 'flex', gap: 24, marginTop: 16, overflowX: 'auto' }}>
-          {rounds.map(({ round, matches }) => (
-            <div key={round} style={{ minWidth: 360 }}>
-              <h2>Runda {round}</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {matches.map((m) => {
-                  const t1 = teams.find((t) => t.id === m.team1Id)
-                  const t2 = teams.find((t) => t.id === m.team2Id)
-                  const w = teams.find((t) => t.id === m.winnerId)
-
-                  const borderColor = m.status === 'live' ? '#f59e0b' : '#e5e7eb'
-
-                  return (
-                    <div key={m.id} style={{ border: `2px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>
-                        #{m.matchNumber} • {m.status}
-                      </div>
-
-                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ color: t1?.color ?? undefined, fontWeight: m.winnerId === m.team1Id ? 800 : 600 }}>
-                          {teamLabel(t1)}
-                        </div>
-                        <div style={{ color: t2?.color ?? undefined, fontWeight: m.winnerId === m.team2Id ? 800 : 600 }}>
-                          {teamLabel(t2)}
-                        </div>
-                      </div>
-
-                      {w ? (
-                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>Zwycięzca: {teamLabel(w)}</div>
-                      ) : null}
-                    </div>
-                  )
-                })}
+        {rounds.length === 0 ? (
+          <div className="card">
+            <div className="empty-state">
+              <div className="empty-state-icon">🏆</div>
+              <div className="empty-state-text">
+                Drabinka nie została jeszcze wygenerowana.
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="bracket-rounds">
+            {rounds.map(({ round, matches }) => (
+              <div key={round} className="bracket-round">
+                <h3>{getRoundName(round, totalRounds)}</h3>
+                <div className="list">
+                  {matches.map((m) => {
+                    const t1 = teams.find((t) => t.id === m.team1Id)
+                    const t2 = teams.find((t) => t.id === m.team2Id)
+                    const w = teams.find((t) => t.id === m.winnerId)
+
+                    return (
+                      <div key={m.id} className={`match-card ${m.status}`}>
+                        <div className="match-card-header">
+                          <span className="match-number">Mecz #{m.matchNumber}</span>
+                          <span className={`status-badge ${m.status}`}>
+                            {m.status === 'pending' ? 'Oczekuje' : m.status === 'live' ? 'Na żywo' : 'Zakończony'}
+                          </span>
+                        </div>
+
+                        <div className="match-teams">
+                          <div
+                            className={`match-team ${m.winnerId === m.team1Id ? 'winner' : ''}`}
+                            style={{ color: t1?.color || undefined }}
+                          >
+                            {teamLabel(t1)}
+                          </div>
+                          <div
+                            className={`match-team ${m.winnerId === m.team2Id ? 'winner' : ''}`}
+                            style={{ color: t2?.color || undefined }}
+                          >
+                            {teamLabel(t2)}
+                          </div>
+                        </div>
+
+                        {w && (
+                          <div className="text-dim" style={{ fontSize: 13 }}>
+                            ✓ Zwycięzca: {teamLabel(w)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

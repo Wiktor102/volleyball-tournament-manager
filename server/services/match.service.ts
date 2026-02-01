@@ -2,7 +2,6 @@ import { and, eq, ne, type InferSelectModel } from 'drizzle-orm'
 import { db } from '../db'
 import { bracketMatches, matchScores } from '../db/schema'
 import { id } from '../utils/id'
-import { getOrCreateDemoTeams } from './team.service'
 
 type MatchRow = InferSelectModel<typeof bracketMatches>
 type ScoreRow = InferSelectModel<typeof matchScores>
@@ -217,27 +216,4 @@ export async function decrementPoint(matchId: string, team: 'team1' | 'team2') {
     .set({ ...next, updatedAt: Date.now() })
     .where(eq(matchScores.matchId, matchId))
   return await getMatchScore(matchId)
-}
-
-export async function createDemoMatch(tournamentId: string) {
-  const now = Date.now()
-  const matchId = id('m')
-
-  const [a, b] = await getOrCreateDemoTeams(tournamentId)
-
-  await db.insert(bracketMatches).values({
-    id: matchId,
-    tournamentId,
-    roundNumber: 0,
-    matchNumber: 0,
-    positionInRound: 0,
-    team1Id: a?.id ?? null,
-    team2Id: b?.id ?? null,
-    status: 'live',
-    isThirdPlaceMatch: false,
-    createdAt: now,
-    updatedAt: now,
-  })
-  await ensureMatchScore(matchId)
-  return await getMatch(matchId)
 }

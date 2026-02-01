@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -55,47 +56,38 @@ export function StreamOverlay() {
   }, [socket, matchId, setScore])
 
   const params = new URLSearchParams(window.location.search)
-  const transparent = params.get('transparent') === 'true'
+  const transparent = params.get('transparent') !== 'false'
 
   const team1 = teams.find((t) => t.id === team1Id)
   const team2 = teams.find((t) => t.id === team2Id)
 
-  return (
-    <div
-      style={{
-        width: '100vw',
-        height: '100vh',
-        background: transparent ? 'transparent' : '#111827',
-        color: 'white',
-        fontFamily: 'system-ui',
-        padding: 24,
-      }}
-    >
-      <div style={{ opacity: 0.6 }}>Overlay ({connected ? 'online' : 'offline'})</div>
+  const hasActiveMatch = !!matchId && !!team1Id && !!team2Id
 
-      <div
-        style={{
-          position: 'absolute',
-          left: 24,
-          right: 24,
-          bottom: 24,
-          background: 'rgba(0,0,0,0.6)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 16,
-          padding: 16,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ fontSize: 28, fontWeight: 700, color: team1?.color ?? undefined }}>{team1?.name ?? 'DRUŻYNA 1'}</div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
-          <div style={{ fontSize: 56, fontWeight: 800 }}>{score?.team1CurrentPoints ?? 0}</div>
-          <div style={{ opacity: 0.5 }}>:</div>
-          <div style={{ fontSize: 56, fontWeight: 800 }}>{score?.team2CurrentPoints ?? 0}</div>
+  return (
+    <div className={`overlay-page ${!transparent ? 'with-bg' : ''}`}>
+      {/* Debug indicator (only in non-transparent mode) */}
+      {!transparent && (
+        <div style={{ position: 'absolute', top: 24, left: 24, opacity: 0.4, fontSize: 12 }}>
+          Overlay ({connected ? 'online' : 'offline'})
         </div>
-        <div style={{ fontSize: 28, fontWeight: 700, textAlign: 'right', color: team2?.color ?? undefined }}>{team2?.name ?? 'DRUŻYNA 2'}</div>
-      </div>
+      )}
+
+      {/* Score Bar */}
+      {hasActiveMatch && (
+        <div className="overlay-scorebar">
+          <div className="overlay-team" style={{ color: team1?.color || '#ffffff' }}>
+            {team1?.name ?? 'DRUŻYNA 1'}
+          </div>
+          <div className="overlay-scores">
+            <div className="overlay-score">{score?.team1CurrentPoints ?? 0}</div>
+            <div className="overlay-separator">:</div>
+            <div className="overlay-score">{score?.team2CurrentPoints ?? 0}</div>
+          </div>
+          <div className="overlay-team" style={{ color: team2?.color || '#ffffff', textAlign: 'right' }}>
+            {team2?.name ?? 'DRUŻYNA 2'}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

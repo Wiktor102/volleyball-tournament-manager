@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import type { MatchScore } from '../../stores/match.store'
+import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -176,91 +177,144 @@ export function MatchControl() {
 
   if (!matchId) {
     return (
-      <div style={{ fontFamily: 'system-ui', padding: 24 }}>
-        <h1>Kontrola meczu</h1>
-        <div>Brak ID meczu w URL.</div>
-        <div style={{ marginTop: 12 }}>
-          <Link to="/admin/bracket">← Drabinka</Link>
+      <div className="admin-page">
+        <div className="admin-container">
+          <div className="card">
+            <h2>Kontrola meczu</h2>
+            <p className="text-muted">Brak ID meczu w URL.</p>
+            <Link to="/admin/bracket" className="btn btn-secondary">
+              ← Wróć do drabinki
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ fontFamily: 'system-ui', padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-        <h1 style={{ margin: 0 }}>Kontrola meczu</h1>
-        <Link to="/admin/bracket">← Drabinka</Link>
+    <div className="admin-page">
+      <div className="admin-container">
+        <header className="admin-header">
+          <div className="flex items-center gap-2">
+            <h1>Kontrola meczu</h1>
+            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
+              {connected ? 'Połączono' : 'Rozłączono'}
+            </span>
+          </div>
+          <nav className="admin-nav">
+            <Link to="/admin/bracket">← Drabinka</Link>
+            <Link to="/admin">Panel główny</Link>
+            <Link to="/display/fan">Widok fanów</Link>
+            <Link to="/overlay">Overlay</Link>
+          </nav>
+        </header>
+
+        {!match ? (
+          <div className="card">
+            <div className="empty-state">
+              <div className="empty-state-icon">🏐</div>
+              <div className="empty-state-text">Nie znaleziono meczu w drabince.</div>
+              <button className="btn btn-secondary" onClick={loadMatch} disabled={!tournament}>
+                Odśwież
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Match Info Bar */}
+            <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+              <div className="flex items-center gap-2">
+                <span className="text-muted">Mecz #{match.matchNumber}</span>
+                <span className="text-dim">•</span>
+                <span className="text-muted">Runda {match.roundNumber}</span>
+                <span className="text-dim">•</span>
+                <span className={`status-badge ${match.status}`}>
+                  {match.status === 'pending' ? 'Oczekuje' : match.status === 'live' ? 'Na żywo' : 'Zakończony'}
+                </span>
+              </div>
+              <div className="text-dim" style={{ fontSize: 12 }}>Set: {score?.currentSet ?? 1}</div>
+            </div>
+
+            {/* Score Display */}
+            <div className="card">
+              <div className="score-display">
+                <div className="score-team left">
+                  <div className="score-team-name" style={{ color: t1?.color || undefined }}>
+                    {teamLabel(t1)}
+                  </div>
+                  <div className="score-value">{score?.team1CurrentPoints ?? 0}</div>
+                  <div className="score-controls">
+                    <button className="btn btn-secondary btn-lg" disabled={!canScore} onClick={() => dec('team1')}>
+                      −
+                    </button>
+                    <button className="btn btn-primary btn-lg" disabled={!canScore} onClick={() => inc('team1')}>
+                      +
+                    </button>
+                  </div>
+                  <div className="keyboard-hint mt-2">A (+) / Q (-)</div>
+                </div>
+
+                <div className="score-vs">vs</div>
+
+                <div className="score-team right">
+                  <div className="score-team-name" style={{ color: t2?.color || undefined }}>
+                    {teamLabel(t2)}
+                  </div>
+                  <div className="score-value">{score?.team2CurrentPoints ?? 0}</div>
+                  <div className="score-controls">
+                    <button className="btn btn-secondary btn-lg" disabled={!canScore} onClick={() => dec('team2')}>
+                      −
+                    </button>
+                    <button className="btn btn-primary btn-lg" disabled={!canScore} onClick={() => inc('team2')}>
+                      +
+                    </button>
+                  </div>
+                  <div className="keyboard-hint mt-2">L (+) / P (-)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Match Controls */}
+            <div className="card">
+              <div className="card-header">
+                <h2>Kontrola meczu</h2>
+              </div>
+              <div className="btn-group">
+                <button className="btn btn-success btn-lg" disabled={!canStart} onClick={start}>
+                  ▶ Rozpocznij mecz
+                </button>
+
+                <button
+                  className="btn btn-primary btn-lg"
+                  disabled={match.status !== 'live' || !match.team1Id}
+                  onClick={() => end(match.team1Id!)}
+                >
+                  🏆 Wygrywa {t1?.shortName || t1?.name || 'Drużyna 1'}
+                </button>
+                <button
+                  className="btn btn-primary btn-lg"
+                  disabled={match.status !== 'live' || !match.team2Id}
+                  onClick={() => end(match.team2Id!)}
+                >
+                  🏆 Wygrywa {t2?.shortName || t2?.name || 'Drużyna 2'}
+                </button>
+
+                <button className="btn btn-danger btn-lg" onClick={reset}>
+                  ↺ Resetuj mecz
+                </button>
+              </div>
+
+              {match.winnerId && (
+                <div className="info-message mt-2">
+                  <strong>Zwycięzca:</strong> {teamLabel(teams.find((t) => t.id === match.winnerId))}
+                </div>
+              )}
+
+              {error && <div className="error-message">{error}</div>}
+            </div>
+          </>
+        )}
       </div>
-      <div style={{ opacity: 0.7 }}>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
-
-      {!match ? (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ opacity: 0.8 }}>Nie znaleziono meczu w drabince.</div>
-          <button style={{ marginTop: 12 }} onClick={loadMatch} disabled={!tournament}>
-            Odśwież
-          </button>
-        </div>
-      ) : (
-        <>
-          <div style={{ marginTop: 12, opacity: 0.75 }}>
-            Runda {match.roundNumber} • #{match.matchNumber} • {match.status}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, gap: 24 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: t1?.color ?? undefined }}>{teamLabel(t1)}</div>
-              <div style={{ fontSize: 140, fontWeight: 900, lineHeight: 1 }}>{score?.team1CurrentPoints ?? 0}</div>
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                <button disabled={!canScore} onClick={() => dec('team1')}>
-                  -
-                </button>
-                <button disabled={!canScore} onClick={() => inc('team1')}>
-                  +
-                </button>
-              </div>
-              <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>Skróty: A (+), Q (-)</div>
-            </div>
-
-            <div style={{ flex: 1, textAlign: 'right' }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: t2?.color ?? undefined }}>{teamLabel(t2)}</div>
-              <div style={{ fontSize: 140, fontWeight: 900, lineHeight: 1 }}>{score?.team2CurrentPoints ?? 0}</div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-                <button disabled={!canScore} onClick={() => dec('team2')}>
-                  -
-                </button>
-                <button disabled={!canScore} onClick={() => inc('team2')}>
-                  +
-                </button>
-              </div>
-              <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>Skróty: L (+), P (-)</div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16, opacity: 0.75 }}>Aktualny set: {score?.currentSet ?? 1}</div>
-
-          <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button disabled={!canStart} onClick={start}>
-              Start
-            </button>
-
-            <button disabled={match.status !== 'live' || !match.team1Id} onClick={() => end(match.team1Id!)}>
-              Koniec – wygrała {teamLabel(t1)}
-            </button>
-            <button disabled={match.status !== 'live' || !match.team2Id} onClick={() => end(match.team2Id!)}>
-              Koniec – wygrała {teamLabel(t2)}
-            </button>
-
-            <button onClick={reset}>Reset</button>
-          </div>
-
-          {match.winnerId ? (
-            <div style={{ marginTop: 10, opacity: 0.8 }}>Zwycięzca: {teamLabel(teams.find((t) => t.id === match.winnerId))}</div>
-          ) : null}
-
-          {error ? <div style={{ marginTop: 10, color: '#b91c1c' }}>{error}</div> : null}
-        </>
-      )}
     </div>
   )
 }

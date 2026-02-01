@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -94,6 +95,7 @@ export function BracketEditor() {
 
   const clear = () => {
     if (!socket || !tournament) return
+    if (!confirm('Czy na pewno chcesz wyczyścić drabinkę? Ta operacja jest nieodwracalna.')) return
     setError(null)
     socket.emit('admin:bracket:clear', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
       if (!ack.ok) {
@@ -144,114 +146,178 @@ export function BracketEditor() {
     })
   }
 
+  const getRoundName = (round: number, totalRounds: number) => {
+    if (round === totalRounds) return 'Finał'
+    if (round === totalRounds - 1) return 'Półfinały'
+    if (round === totalRounds - 2) return 'Ćwierćfinały'
+    return `Runda ${round}`
+  }
+
+  const totalRounds = Math.max(...rounds.map((r) => r.round), 0)
+
   return (
-    <div style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-        <h1 style={{ margin: 0 }}>Drabinka</h1>
-        <Link to="/admin">← Panel</Link>
-      </div>
+    <div className="admin-page">
+      <div className="admin-container">
+        <header className="admin-header">
+          <div className="flex items-center gap-2">
+            <h1>Drabinka turniejowa</h1>
+            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
+              {connected ? 'Połączono' : 'Rozłączono'}
+            </span>
+          </div>
+          <nav className="admin-nav">
+            <Link to="/admin">← Panel główny</Link>
+            <Link to="/admin/teams">Drużyny</Link>
+            <Link to="/display/bracket">Podgląd publiczny</Link>
+          </nav>
+        </header>
 
-      <div style={{ marginTop: 8, opacity: 0.8 }}>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
+        {/* Actions */}
+        <div className="card">
+          <div className="card-header">
+            <h2>Akcje</h2>
+            <div className="btn-group">
+              <button className="btn btn-primary" onClick={gen} disabled={!tournament || teams.length < 2}>
+                Generuj drabinkę
+              </button>
+              <button className="btn btn-danger" onClick={clear} disabled={!tournament || bracket.length === 0}>
+                Wyczyść drabinkę
+              </button>
+              <button className="btn btn-secondary" onClick={load} disabled={!tournament}>
+                Odśwież
+              </button>
+            </div>
+          </div>
+          {error && <div className="error-message">{error}</div>}
+          {teams.length < 2 && (
+            <div className="info-message">
+              Potrzebujesz co najmniej 2 drużyn, aby wygenerować drabinkę.{' '}
+              <Link to="/admin/teams">Dodaj drużyny →</Link>
+            </div>
+          )}
+        </div>
 
-      <section style={{ marginTop: 16 }}>
-        <button onClick={gen} disabled={!tournament}>
-          Generuj drabinkę
-        </button>{' '}
-        <button onClick={clear} disabled={!tournament}>
-          Wyczyść drabinkę
-        </button>{' '}
-        <button onClick={load} disabled={!tournament}>
-          Odśwież
-        </button>
-        {error ? <div style={{ marginTop: 8, color: '#b91c1c' }}>{error}</div> : null}
-      </section>
-
-      {rounds.length === 0 ? (
-        <div style={{ marginTop: 16, opacity: 0.8 }}>Brak drabinki.</div>
-      ) : (
-        <div style={{ display: 'flex', gap: 24, marginTop: 16, overflowX: 'auto' }}>
-          {rounds.map(({ round, matches }) => (
-            <div key={round} style={{ minWidth: 320 }}>
-              <h2>Runda {round}</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {matches.map((m) => {
-                  const t1 = teams.find((t) => t.id === m.team1Id)
-                  const t2 = teams.find((t) => t.id === m.team2Id)
-                  return (
-                    <div key={m.id} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>
-                        #{m.matchNumber} • {m.status}
-                      </div>
-                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {round === 1 ? (
-                          <select
-                            disabled={m.status !== 'pending'}
-                            value={m.team1Id ?? ''}
-                            onChange={(e) => assign(m.id, 'team1', e.target.value ? e.target.value : null)}
-                          >
-                            <option value="">—</option>
-                            {teams.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {teamLabel(t)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={{ color: t1?.color ?? undefined }}>{teamLabel(t1)}</div>
-                        )}
-
-                        {round === 1 ? (
-                          <select
-                            disabled={m.status !== 'pending'}
-                            value={m.team2Id ?? ''}
-                            onChange={(e) => assign(m.id, 'team2', e.target.value ? e.target.value : null)}
-                          >
-                            <option value="">—</option>
-                            {teams.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {teamLabel(t)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={{ color: t2?.color ?? undefined }}>{teamLabel(t2)}</div>
-                        )}
-                      </div>
-
-                      {m.winnerId ? (
-                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-                          Zwycięzca: {teamLabel(teams.find((t) => t.id === m.winnerId))}
-                        </div>
-                      ) : null}
-
-                      <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
-                        <Link to={`/admin/match/${m.id}`}>Kontrola</Link>
-                        {m.status === 'pending' && m.team1Id && m.team2Id ? <button onClick={() => start(m.id)}>Start</button> : null}
-
-                        {m.status === 'live' ? (
-                          <>
-                            <button disabled={!m.team1Id} onClick={() => end(m.id, m.team1Id!)}>
-                              Wygrała: {teamLabel(t1)}
-                            </button>
-                            <button disabled={!m.team2Id} onClick={() => end(m.id, m.team2Id!)}>
-                              Wygrała: {teamLabel(t2)}
-                            </button>
-                            <button onClick={() => reset(m.id)}>Reset</button>
-                          </>
-                        ) : null}
-
-                        {m.status === 'completed' ? <button onClick={() => reset(m.id)}>Reset</button> : null}
-                      </div>
-
-                      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>ID: {m.id}</div>
-                    </div>
-                  )
-                })}
+        {/* Bracket */}
+        {rounds.length === 0 ? (
+          <div className="card">
+            <div className="empty-state">
+              <div className="empty-state-icon">🏆</div>
+              <div className="empty-state-text">
+                Brak drabinki. Dodaj drużyny i wygeneruj drabinkę, aby rozpocząć turniej.
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="bracket-rounds">
+            {rounds.map(({ round, matches }) => (
+              <div key={round} className="bracket-round">
+                <h3>{getRoundName(round, totalRounds)}</h3>
+                <div className="list">
+                  {matches.map((m) => {
+                    const t1 = teams.find((t) => t.id === m.team1Id)
+                    const t2 = teams.find((t) => t.id === m.team2Id)
+                    return (
+                      <div key={m.id} className={`match-card ${m.status}`}>
+                        <div className="match-card-header">
+                          <span className="match-number">Mecz #{m.matchNumber}</span>
+                          <span className={`status-badge ${m.status}`}>
+                            {m.status === 'pending' ? 'Oczekuje' : m.status === 'live' ? 'Na żywo' : 'Zakończony'}
+                          </span>
+                        </div>
+
+                        <div className="match-teams">
+                          {round === 1 ? (
+                            <select
+                              className="form-select"
+                              disabled={m.status !== 'pending'}
+                              value={m.team1Id ?? ''}
+                              onChange={(e) => assign(m.id, 'team1', e.target.value ? e.target.value : null)}
+                            >
+                              <option value="">— Wybierz drużynę —</option>
+                              {teams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {teamLabel(t)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className={`match-team ${m.winnerId === m.team1Id ? 'winner' : ''}`} style={{ color: t1?.color || undefined }}>
+                              {teamLabel(t1)}
+                            </div>
+                          )}
+
+                          {round === 1 ? (
+                            <select
+                              className="form-select"
+                              disabled={m.status !== 'pending'}
+                              value={m.team2Id ?? ''}
+                              onChange={(e) => assign(m.id, 'team2', e.target.value ? e.target.value : null)}
+                            >
+                              <option value="">— Wybierz drużynę —</option>
+                              {teams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {teamLabel(t)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className={`match-team ${m.winnerId === m.team2Id ? 'winner' : ''}`} style={{ color: t2?.color || undefined }}>
+                              {teamLabel(t2)}
+                            </div>
+                          )}
+                        </div>
+
+                        {m.winnerId && (
+                          <div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
+                            ✓ Zwycięzca: {teamLabel(teams.find((t) => t.id === m.winnerId))}
+                          </div>
+                        )}
+
+                        <div className="btn-group">
+                          <Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
+                            Kontrola meczu
+                          </Link>
+                          {m.status === 'pending' && m.team1Id && m.team2Id && (
+                            <button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
+                              Rozpocznij
+                            </button>
+                          )}
+                          {m.status === 'live' && (
+                            <>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                disabled={!m.team1Id}
+                                onClick={() => end(m.id, m.team1Id!)}
+                              >
+                                Wygrywa {t1?.shortName || t1?.name || 'D1'}
+                              </button>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                disabled={!m.team2Id}
+                                onClick={() => end(m.id, m.team2Id!)}
+                              >
+                                Wygrywa {t2?.shortName || t2?.name || 'D2'}
+                              </button>
+                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id)}>
+                                Reset
+                              </button>
+                            </>
+                          )}
+                          {m.status === 'completed' && (
+                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id)}>
+                              Resetuj mecz
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
