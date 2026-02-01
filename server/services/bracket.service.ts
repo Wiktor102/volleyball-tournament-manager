@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { db } from '../db'
 import { bracketMatches } from '../db/schema'
 import { id } from '../utils/id'
@@ -111,6 +111,7 @@ export async function generateBracket(tournamentId: string) {
 
     for (const m of matches) {
       if (m.status !== 'pending') continue
+      if (m.roundNumber !== 1) continue
       if (m.winnerId) continue
 
       const has1 = !!m.team1Id
@@ -148,6 +149,57 @@ export async function assignTeamToSlot(matchId: string, slot: 'team1' | 'team2',
     .update(bracketMatches)
     .set({ ...patch, updatedAt: now })
     .where(eq(bracketMatches.id, matchId))
+}
+
+export async function recomputeBracket(tournamentId: string) {
+  const now = Date.now()
+
+  // Reset computed state so manual edits don't leave stale winners/propagation.
+  await db
+    .update(bracketMatches)
+    .set({ winnerId: null, status: 'pending', updatedAt: now })
+    .where(and(eq(bracketMatches.tournamentId, tournamentId), eq(bracketMatches.roundNumber, 1)))
+
+  await db
+    .update(bracketMatches)
+    .set({ team1Id: null, team2Id: null, winnerId: null, status: 'pending', updatedAt: now })
+    .where(and(eq(bracketMatches.tournamentId, tournamentId), ne(bracketMatches.roundNumber, 1)))
+
+  // Auto-advance ONLY round-1 byes.
+  let changed = true
+  while (changed) {
+    changed = false
+    const matches = await listBracketMatches(tournamentId)
+
+    for (const m of matches) {
+      if (m.roundNumber !== 1) continue
+      if (m.status !== 'pending') continue
+      if (m.winnerId) continue
+
+      const has1 = !!m.team1Id
+      const has2 = !!m.team2Id
+      if (has1 === has2) continue
+
+      const winnerId = m.team1Id ?? m.team2Id
+      if (!winnerId) continue
+
+      await db
+        .update(bracketMatches)
+        .set({ winnerId, status: 'completed', updatedAt: Date.now() })
+        .where(eq(bracketMatches.id, m.id))
+
+      if (m.nextMatchId) {
+        const position = m.positionInRound % 2 === 1 ? 'team1Id' : 'team2Id'
+        const patch = position === 'team1Id' ? { team1Id: winnerId } : { team2Id: winnerId }
+        await db
+          .update(bracketMatches)
+          .set({ ...patch, updatedAt: Date.now() })
+          .where(eq(bracketMatches.id, m.nextMatchId))
+      }
+
+      changed = true
+    }
+  }
 }
 
 export async function clearBracket(tournamentId: string) {

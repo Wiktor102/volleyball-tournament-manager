@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io'
 import { z } from 'zod'
 import { getTournamentState } from '../../services/state.service'
-import { assignTeamToSlot, clearBracket, generateBracket, listBracketMatches } from '../../services/bracket.service'
+import { assignTeamToSlot, clearBracket, generateBracket, listBracketMatches, recomputeBracket } from '../../services/bracket.service'
 
 const GenerateSchema = z.object({ tournamentId: z.string().min(1) })
 const AssignSchema = z.object({
@@ -40,7 +40,12 @@ export function registerBracketHandlers(io: Server, socket: Socket) {
     const parsed = AssignSchema.safeParse(payload)
     if (!parsed.success) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
 
+    const existing = await listBracketMatches(parsed.data.tournamentId)
+    const locked = existing.some((m) => m.status === 'live' || (m.status === 'completed' && m.team1Id && m.team2Id))
+    if (locked) return ack?.({ ok: false, error: 'Nie można edytować drabinki po rozpoczęciu meczów' })
+
     await assignTeamToSlot(parsed.data.matchId, parsed.data.slot, parsed.data.teamId)
+    await recomputeBracket(parsed.data.tournamentId)
 
     const items = await listBracketMatches(parsed.data.tournamentId)
     io.to(`tournament:${parsed.data.tournamentId}`).emit('bracket:updated', items)

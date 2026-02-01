@@ -102,6 +102,22 @@ export function BracketEditor() {
     })
   }
 
+  const assign = (matchId: string, slot: 'team1' | 'team2', teamId: string | null) => {
+    if (!socket || !tournament) return
+    setError(null)
+    socket.emit(
+      'admin:bracket:assign',
+      { tournamentId: tournament.id, matchId, slot, teamId },
+      (ack: Ack<BracketMatch[]>) => {
+        if (!ack.ok) {
+          setError(ack.error)
+          return
+        }
+        setBracket(ack.data)
+      },
+    )
+  }
+
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
@@ -140,9 +156,38 @@ export function BracketEditor() {
                       <div style={{ fontSize: 12, opacity: 0.7 }}>
                         #{m.matchNumber} • {m.status}
                       </div>
-                      <div style={{ marginTop: 6 }}>
-                        <div style={{ color: t1?.color ?? undefined }}>{teamLabel(t1)}</div>
-                        <div style={{ color: t2?.color ?? undefined }}>{teamLabel(t2)}</div>
+                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {round === 1 ? (
+                          <select
+                            value={m.team1Id ?? ''}
+                            onChange={(e) => assign(m.id, 'team1', e.target.value ? e.target.value : null)}
+                          >
+                            <option value="">—</option>
+                            {teams.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {teamLabel(t)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div style={{ color: t1?.color ?? undefined }}>{teamLabel(t1)}</div>
+                        )}
+
+                        {round === 1 ? (
+                          <select
+                            value={m.team2Id ?? ''}
+                            onChange={(e) => assign(m.id, 'team2', e.target.value ? e.target.value : null)}
+                          >
+                            <option value="">—</option>
+                            {teams.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {teamLabel(t)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div style={{ color: t2?.color ?? undefined }}>{teamLabel(t2)}</div>
+                        )}
                       </div>
                       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>ID: {m.id}</div>
                     </div>
