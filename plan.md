@@ -646,10 +646,10 @@ When multiple admins edit simultaneously:
   - [ ] Timer controls (for timed mode)
   - [ ] Undo functionality
   - [ ] End match / advance winner
-- [ ] Teams Manager page
-  - [ ] Team list with edit/delete
+- [x] Teams Manager page
+  - [x] Team list with edit/delete
   - [ ] Player management per team
-  - [ ] Team color picker
+  - [x] Team color picker
 
 ### Phase 5: Display Views
 - [ ] Fan View (big screen display)
