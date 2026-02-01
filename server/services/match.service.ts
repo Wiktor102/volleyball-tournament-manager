@@ -2,6 +2,7 @@ import { and, eq, ne, type InferSelectModel } from 'drizzle-orm'
 import { db } from '../db'
 import { bracketMatches, matchScores } from '../db/schema'
 import { id } from '../utils/id'
+import { listBracketMatches } from './bracket.service'
 
 type MatchRow = InferSelectModel<typeof bracketMatches>
 type ScoreRow = InferSelectModel<typeof matchScores>
@@ -143,6 +144,8 @@ export async function endMatch(tournamentId: string, matchId: string, winnerId: 
   if (m.status !== 'live') return { ok: false as const, error: 'Mecz nie jest aktywny (live)' }
   if (winnerId !== m.team1Id && winnerId !== m.team2Id) return { ok: false as const, error: 'Nieprawidłowy zwycięzca' }
 
+  const loserId = winnerId === m.team1Id ? m.team2Id : m.team1Id
+
   await db
     .update(bracketMatches)
     .set({ winnerId, status: 'completed', updatedAt: now })
@@ -156,9 +159,70 @@ export async function endMatch(tournamentId: string, matchId: string, winnerId: 
     await db.update(bracketMatches).set({ ...patch, updatedAt: now }).where(eq(bracketMatches.id, m.nextMatchId))
   }
 
+  // Check if this was a semifinal and if we should create 3rd place match
+  await maybeCreateThirdPlaceMatch(tournamentId, m, loserId)
+
   const updated = await getMatch(matchId)
   if (!updated) return { ok: false as const, error: 'Nie udało się zakończyć meczu' }
   return { ok: true as const, match: updated }
+}
+
+async function maybeCreateThirdPlaceMatch(tournamentId: string, completedMatch: Match, loserId: string | null) {
+  if (!loserId) return
+
+  const allMatches = await listBracketMatches(tournamentId)
+  
+  // Find the final (highest round number, not 3rd place)
+  const regularMatches = allMatches.filter(m => !m.isThirdPlaceMatch)
+  if (regularMatches.length === 0) return
+  
+  const maxRound = Math.max(...regularMatches.map(m => m.roundNumber))
+  
+  // Check if this match is a semifinal (round before final)
+  const semifinalRound = maxRound - 1
+  if (completedMatch.roundNumber !== semifinalRound || semifinalRound < 1) return
+  
+  // Check if 3rd place match already exists
+  const existingThirdPlace = allMatches.find(m => m.isThirdPlaceMatch)
+  if (existingThirdPlace) {
+    // Update the existing 3rd place match with the loser
+    const position = completedMatch.positionInRound % 2 === 1 ? 'team1Id' : 'team2Id'
+    const patch = position === 'team1Id' ? { team1Id: loserId } : { team2Id: loserId }
+    await db
+      .update(bracketMatches)
+      .set({ ...patch, updatedAt: Date.now() })
+      .where(eq(bracketMatches.id, existingThirdPlace.id))
+    return
+  }
+  
+  // Get both semifinals
+  const semifinals = regularMatches.filter(m => m.roundNumber === semifinalRound)
+  if (semifinals.length !== 2) return
+  
+  // Check if both semifinals are completed
+  const bothCompleted = semifinals.every(m => m.status === 'completed' && m.winnerId)
+  
+  // Create 3rd place match only after first semifinal completes
+  // (the second loser will be added when their semifinal ends)
+  const now = Date.now()
+  const thirdPlaceId = id('m')
+  
+  await db.insert(bracketMatches).values({
+    id: thirdPlaceId,
+    tournamentId,
+    roundNumber: maxRound, // Same round as final for display purposes
+    matchNumber: 0, // Special match number for 3rd place
+    positionInRound: 0,
+    team1Id: loserId,
+    team2Id: null, // Will be filled when second semifinal ends
+    winnerId: null,
+    status: 'pending',
+    isThirdPlaceMatch: true,
+    nextMatchId: null,
+    scheduledTime: null,
+    createdAt: now,
+    updatedAt: now,
+  })
 }
 
 export async function resetMatch(tournamentId: string, matchId: string) {

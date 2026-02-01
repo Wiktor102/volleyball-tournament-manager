@@ -66,14 +66,19 @@ export function BracketEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournament?.id])
 
-  const rounds = useMemo(() => {
+  const { rounds, thirdPlaceMatch } = useMemo(() => {
+    const regularMatches = bracket.filter(m => !m.isThirdPlaceMatch)
+    const thirdPlace = bracket.find(m => m.isThirdPlaceMatch) ?? null
+    
     const map = new Map<number, BracketMatch[]>()
-    for (const m of bracket) {
+    for (const m of regularMatches) {
       map.set(m.roundNumber, [...(map.get(m.roundNumber) ?? []), m])
     }
-    return Array.from(map.entries())
+    const roundsList = Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([round, matches]) => ({ round, matches: matches.sort((a, b) => a.positionInRound - b.positionInRound) }))
+    
+    return { rounds: roundsList, thirdPlaceMatch: thirdPlace }
   }, [bracket])
 
   const teamLabel = (t: Team | undefined) => {
@@ -315,6 +320,82 @@ export function BracketEditor() {
                 </div>
               </div>
             ))}
+            
+            {/* 3rd Place Match */}
+            {thirdPlaceMatch && (
+              <div className="bracket-round">
+                <h3>🥉 Mecz o 3. miejsce</h3>
+                <div className="list">
+                  {(() => {
+                    const m = thirdPlaceMatch
+                    const t1 = teams.find((t) => t.id === m.team1Id)
+                    const t2 = teams.find((t) => t.id === m.team2Id)
+                    return (
+                      <div key={m.id} className={`match-card ${m.status}`}>
+                        <div className="match-card-header">
+                          <span className="match-number">O 3. miejsce</span>
+                          <span className={`status-badge ${m.status}`}>
+                            {m.status === 'pending' ? 'Oczekuje' : m.status === 'live' ? 'Na żywo' : 'Zakończony'}
+                          </span>
+                        </div>
+
+                        <div className="match-teams">
+                          <div className={`match-team ${m.winnerId === m.team1Id ? 'winner' : ''}`} style={{ color: t1?.color || undefined }}>
+                            {teamLabel(t1)}
+                          </div>
+                          <div className={`match-team ${m.winnerId === m.team2Id ? 'winner' : ''}`} style={{ color: t2?.color || undefined }}>
+                            {teamLabel(t2)}
+                          </div>
+                        </div>
+
+                        {m.winnerId && (
+                          <div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
+                            🥉 3. miejsce: {teamLabel(teams.find((t) => t.id === m.winnerId))}
+                          </div>
+                        )}
+
+                        <div className="btn-group">
+                          <Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
+                            Kontrola meczu
+                          </Link>
+                          {m.status === 'pending' && m.team1Id && m.team2Id && (
+                            <button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
+                              Rozpocznij
+                            </button>
+                          )}
+                          {m.status === 'live' && (
+                            <>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                disabled={!m.team1Id}
+                                onClick={() => end(m.id, m.team1Id!)}
+                              >
+                                Wygrywa {t1?.shortName || t1?.name || 'D1'}
+                              </button>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                disabled={!m.team2Id}
+                                onClick={() => end(m.id, m.team2Id!)}
+                              >
+                                Wygrywa {t2?.shortName || t2?.name || 'D2'}
+                              </button>
+                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id)}>
+                                Reset
+                              </button>
+                            </>
+                          )}
+                          {m.status === 'completed' && (
+                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id)}>
+                              Resetuj mecz
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
