@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
@@ -10,6 +10,29 @@ export function StreamOverlay() {
   const { socket, connected, onReconnect } = useSocket()
   const { teams, setTournament, setTeams } = useTournamentStore()
   const { matchId, team1Id, team2Id, score, setMatchId, setMatchTeams, setScore } = useMatchStore()
+  
+  // Animation state
+  const [animatingTeam1, setAnimatingTeam1] = useState(false)
+  const [animatingTeam2, setAnimatingTeam2] = useState(false)
+  const prevScoreRef = useRef<{ t1: number; t2: number } | null>(null)
+
+  // Track score changes for animations
+  useEffect(() => {
+    if (!score) return
+    
+    const prev = prevScoreRef.current
+    if (prev) {
+      if (score.team1CurrentPoints !== prev.t1) {
+        setAnimatingTeam1(true)
+        setTimeout(() => setAnimatingTeam1(false), 400)
+      }
+      if (score.team2CurrentPoints !== prev.t2) {
+        setAnimatingTeam2(true)
+        setTimeout(() => setAnimatingTeam2(false), 400)
+      }
+    }
+    prevScoreRef.current = { t1: score.team1CurrentPoints, t2: score.team2CurrentPoints }
+  }, [score?.team1CurrentPoints, score?.team2CurrentPoints])
 
   // Function to refresh all state from server
   const refreshState = useCallback(() => {
@@ -103,9 +126,13 @@ export function StreamOverlay() {
                 <span style={{ color: team2?.color || '#ffffff' }}>{score?.team2Sets ?? 0}</span>
               </div>
             )}
-            <div className="overlay-score">{score?.team1CurrentPoints ?? 0}</div>
+            <div className={`overlay-score ${animatingTeam1 ? 'score-changed' : ''}`}>
+              {score?.team1CurrentPoints ?? 0}
+            </div>
             <div className="overlay-separator">:</div>
-            <div className="overlay-score">{score?.team2CurrentPoints ?? 0}</div>
+            <div className={`overlay-score ${animatingTeam2 ? 'score-changed' : ''}`}>
+              {score?.team2CurrentPoints ?? 0}
+            </div>
           </div>
           <div className="overlay-team" style={{ color: team2?.color || '#ffffff', textAlign: 'right' }}>
             {team2?.name ?? 'DRUŻYNA 2'}
