@@ -18,6 +18,8 @@
 - [x] Socket.io event handlers (match, bracket, team events)
 - [x] Third place match auto-creation after semifinals
 - [x] Volleyball scoring with sets (auto-detect 25pt/2-point advantage, tie-break to 15)
+- [x] Tournament service (CRUD with settings, list, delete)
+- [x] Player service (CRUD + team assignment)
 
 ### Phase 3: Shared Infrastructure
 - [x] Socket.io React context with reconnect handling
@@ -37,6 +39,7 @@
   - [x] Add new team form
   - [x] Inline color picker
   - [x] Real-time updates
+  - [x] Player management per team (expandable section)
 - [x] Bracket Editor page (/admin/bracket)
   - [x] Visual bracket display with sets support
   - [x] Manual team assignment
@@ -48,6 +51,11 @@
   - [x] Increment/decrement buttons (A/Q, L/P keyboard shortcuts)
   - [x] Set management (award set, undo set)
   - [x] End match / advance winner controls
+- [x] Tournament Setup page (/admin/tournament/:id)
+  - [x] Create/edit tournament
+  - [x] Scoring mode configuration (sets to win, points per set, tie-break)
+  - [x] Tournament status management
+  - [x] Delete tournament with typed confirmation
 
 ### Phase 5: Display Views
 - [x] Fan View (/display/fan)
@@ -80,9 +88,19 @@
   - [x] Status badges with animations
   - [x] Sets display styling
   - [x] Toast notification styling
+  - [x] Modal styling for confirmations
 - [x] Keyboard shortcuts for score control (A/Q, L/P)
 - [x] Toast notifications for all user actions
 - [x] Connection status indicators
+- [x] Confirmation modals for destructive actions
+  - [x] Team deletion
+  - [x] Tournament deletion (with typed confirmation)
+  - [x] Bracket clearing
+  - [x] Match reset
+
+### Phase 8: Production & Deployment
+- [x] Production start script (npm start)
+- [x] Frontend served from Express in production
 
 ---
 
@@ -91,8 +109,8 @@
 ### Remaining Work (High Priority)
 
 #### 1. Backend Services
-- [ ] Tournament service (create, update, delete, list with full CRUD)
-- [ ] Player service (CRUD + team assignment)
+- [x] Tournament service (create, update, delete, list with full CRUD)
+- [x] Player service (CRUD + team assignment)
 - [ ] Scoring service (pluggable modes, persist config per tournament)
 - [ ] Scoring modes:
   - [x] Points (simple increment)
@@ -100,26 +118,25 @@
   - [ ] Timed (match timer, overtime, golden set)
 
 #### 2. Admin Features
-- [ ] Tournament setup wizard / creation flow
-  - [ ] Basic tournament info (name, date, etc.)
-  - [ ] Scoring mode configuration
+- [x] Tournament setup wizard / creation flow
+  - [x] Basic tournament info (name, status)
+  - [x] Scoring mode configuration
   - [ ] Team import (CSV/JSON)
   - [ ] Bracket generation/import
-- [ ] Player management per team
+- [x] Player management per team
 - [ ] Set management improvements:
   - [ ] Manual set score input
   - [ ] Set duration tracking
   - [ ] Highlight current set
 - [ ] Undo/redo for admin actions
-- [ ] Protective confirmations for destructive / non-normal admin actions
-  - [ ] Confirmation modal for editing a **completed** match (edit, reset, change winner)
+- [x] Protective confirmations for destructive / non-normal admin actions
+  - [x] Confirmation modal for resetting a match
   - [ ] Confirmation for forcing / manually setting a **match winner**
-  - [ ] Confirmation for deleting **match/team/tournament**
+  - [x] Confirmation for deleting team/tournament
   - [ ] Confirmation when importing a bracket that will **overwrite** existing assignments
-  - [ ] Confirmation for bulk destructive operations (reset tournament, clear all matches)
-  - [ ] UX: add "I understand" checkbox or typed confirmation option for very dangerous actions
+  - [x] Confirmation for clearing bracket
+  - [x] UX: typed confirmation for very dangerous actions (tournament delete)
   - [ ] Add admin preference to opt-out of confirmations (conservative default = enabled)
-  - [ ] Add audit logging and toast notifications for confirmed actions
 
 #### 3. Display Views
 - [ ] Fan View enhancements:
@@ -158,15 +175,15 @@
 - [ ] Comprehensive error handling
   - [ ] Network errors with recovery UI
   - [ ] Database errors with logging
-  - [ ] Socket disconnection handling
+  - [x] Socket disconnection handling (reconnect with state refresh)
 - [ ] Mobile-responsive admin interface
 - [ ] Cross-browser testing (Chrome, Firefox, Edge, Safari)
 
 #### 6. Production & Deployment
-- [ ] Combine frontend and backend builds
-  - [ ] Serve React build from Express
+- [x] Combine frontend and backend builds
+  - [x] Serve React build from Express
   - [ ] Production environment variables
-  - [ ] Minified assets
+  - [x] Minified assets (Vite build)
 - [ ] Create production deployment guide
 - [ ] Test portable deployment (USB drive)
   - [ ] Relative database paths
@@ -250,7 +267,7 @@
 - [ ] Write usage documentation (Polish)
 - [ ] Create "getting started" guide
 - [ ] Add helpful tooltips in UI
-- [ ] Create production build scripts
+- [x] Create production start script
 - [ ] Test portable deployment (USB drive scenario)
 
 ---
@@ -265,11 +282,16 @@ Completed:
 5. ✅ Fan view with sets display
 6. ✅ Overlay score animations
 7. ✅ Unified TODO documentation
+8. ✅ Tournament service CRUD (create, update, delete, list)
+9. ✅ Tournament Setup page with scoring configuration
+10. ✅ Player service CRUD
+11. ✅ Player management in TeamsManager
+12. ✅ Confirmation modals for destructive actions
+13. ✅ Production build setup (npm run build && npm start)
 
 Next priorities:
-- Player service (CRUD)
-- Tournament CRUD operations
 - Timed scoring mode
-- Player view (/display/player)
+- Player Info View (/display/player)
+- Fan View next match preview
 - Overlay info rotator
-- Production build setup
+- Documentation & deployment guide
