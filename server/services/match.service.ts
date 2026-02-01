@@ -1,4 +1,4 @@
-import { eq, type InferSelectModel } from 'drizzle-orm'
+import { and, eq, ne, type InferSelectModel } from 'drizzle-orm'
 import { db } from '../db'
 import { bracketMatches, matchScores } from '../db/schema'
 import { id } from '../utils/id'
@@ -87,6 +87,110 @@ export async function ensureMatchScore(matchId: string) {
   const created = await getMatchScore(matchId)
   if (!created) throw new Error('Failed to create match score')
   return created
+}
+
+export async function resetMatchScore(matchId: string, opts?: { startedAt?: number | null; endedAt?: number | null }) {
+  const now = Date.now()
+  await ensureMatchScore(matchId)
+
+  await db
+    .update(matchScores)
+    .set({
+      team1Sets: 0,
+      team2Sets: 0,
+      currentSet: 1,
+      setsToWin: 2,
+      setScoresJson: '[]',
+      team1CurrentPoints: 0,
+      team2CurrentPoints: 0,
+      matchTimeSeconds: 0,
+      startedAt: opts?.startedAt ?? null,
+      endedAt: opts?.endedAt ?? null,
+      updatedAt: now,
+    })
+    .where(eq(matchScores.matchId, matchId))
+
+  return await getMatchScore(matchId)
+}
+
+export async function startMatch(tournamentId: string, matchId: string) {
+  const now = Date.now()
+
+  const m = await getMatch(matchId)
+  if (!m || m.tournamentId !== tournamentId) return { ok: false as const, error: 'Nie znaleziono meczu' }
+  if (m.status !== 'pending') return { ok: false as const, error: 'Mecz nie jest w stanie "pending"' }
+  if (!m.team1Id || !m.team2Id) return { ok: false as const, error: 'Najpierw przypisz dwie drużyny' }
+
+  const otherLive = await db
+    .select({ id: bracketMatches.id })
+    .from(bracketMatches)
+    .where(and(eq(bracketMatches.tournamentId, tournamentId), eq(bracketMatches.status, 'live'), ne(bracketMatches.id, matchId)))
+    .limit(1)
+  if (otherLive.length > 0) return { ok: false as const, error: 'Jest już aktywny mecz (live)' }
+
+  await db.update(bracketMatches).set({ status: 'live', updatedAt: now }).where(eq(bracketMatches.id, matchId))
+  await resetMatchScore(matchId, { startedAt: now, endedAt: null })
+
+  const updated = await getMatch(matchId)
+  if (!updated) return { ok: false as const, error: 'Nie udało się uruchomić meczu' }
+  return { ok: true as const, match: updated }
+}
+
+export async function endMatch(tournamentId: string, matchId: string, winnerId: string) {
+  const now = Date.now()
+
+  const m = await getMatch(matchId)
+  if (!m || m.tournamentId !== tournamentId) return { ok: false as const, error: 'Nie znaleziono meczu' }
+  if (m.status !== 'live') return { ok: false as const, error: 'Mecz nie jest aktywny (live)' }
+  if (winnerId !== m.team1Id && winnerId !== m.team2Id) return { ok: false as const, error: 'Nieprawidłowy zwycięzca' }
+
+  await db
+    .update(bracketMatches)
+    .set({ winnerId, status: 'completed', updatedAt: now })
+    .where(eq(bracketMatches.id, matchId))
+
+  await db.update(matchScores).set({ endedAt: now, updatedAt: now }).where(eq(matchScores.matchId, matchId))
+
+  if (m.nextMatchId) {
+    const position = m.positionInRound % 2 === 1 ? 'team1Id' : 'team2Id'
+    const patch = position === 'team1Id' ? { team1Id: winnerId } : { team2Id: winnerId }
+    await db.update(bracketMatches).set({ ...patch, updatedAt: now }).where(eq(bracketMatches.id, m.nextMatchId))
+  }
+
+  const updated = await getMatch(matchId)
+  if (!updated) return { ok: false as const, error: 'Nie udało się zakończyć meczu' }
+  return { ok: true as const, match: updated }
+}
+
+export async function resetMatch(tournamentId: string, matchId: string) {
+  const now = Date.now()
+
+  const m = await getMatch(matchId)
+  if (!m || m.tournamentId !== tournamentId) return { ok: false as const, error: 'Nie znaleziono meczu' }
+  if (m.status === 'pending') return { ok: true as const, match: m }
+
+  if (m.nextMatchId) {
+    const next = await getMatch(m.nextMatchId)
+    if (next && next.status !== 'pending') return { ok: false as const, error: 'Nie można resetować po rozpoczęciu kolejnego meczu' }
+
+    // Remove propagated winner only if it matches what this match had set.
+    if (m.winnerId) {
+      const isOdd = m.positionInRound % 2 === 1
+      const patch = isOdd ? { team1Id: null } : { team2Id: null }
+      const guard = isOdd ? eq(bracketMatches.team1Id, m.winnerId) : eq(bracketMatches.team2Id, m.winnerId)
+      await db
+        .update(bracketMatches)
+        .set({ ...patch, updatedAt: now })
+        .where(and(eq(bracketMatches.id, m.nextMatchId), guard))
+    }
+  }
+
+  await db.update(bracketMatches).set({ status: 'pending', winnerId: null, updatedAt: now }).where(eq(bracketMatches.id, matchId))
+  await resetMatchScore(matchId, { startedAt: null, endedAt: null })
+
+  const updated = await getMatch(matchId)
+  if (!updated) return { ok: false as const, error: 'Nie udało się zresetować meczu' }
+  return { ok: true as const, match: updated }
 }
 
 export async function incrementPoint(matchId: string, team: 'team1' | 'team2') {

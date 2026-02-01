@@ -39,3 +39,19 @@ export const ScoreIncrementSchema = z.object({
 })
 
 export const ScoreDecrementSchema = ScoreIncrementSchema
+
+export const MatchStartSchema = z.object({
+  tournamentId: z.string().min(1),
+  matchId: z.string().min(1),
+})
+
+export const MatchEndSchema = z.object({
+  tournamentId: z.string().min(1),
+  matchId: z.string().min(1),
+  winnerId: z.string().min(1),
+})
+
+export const MatchResetSchema = z.object({
+  tournamentId: z.string().min(1),
+  matchId: z.string().min(1),
+})
