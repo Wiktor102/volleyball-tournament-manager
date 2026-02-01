@@ -76,6 +76,7 @@ export function Dashboard() {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
         <h1 style={{ margin: 0 }}>Panel administratora</h1>
         <Link to="/admin/teams">Drużyny →</Link>
+        <Link to="/admin/bracket">Drabinka →</Link>
       </div>
       <div>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
 
