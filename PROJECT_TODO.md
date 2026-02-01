@@ -5,7 +5,8 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 ## 0) Status „zrobione” (dla kontekstu)
 - [x] Full-stack dev: Vite (5173) + Express/Socket.io (5174)
 - [x] SQLite + Drizzle + migracje
-- [x] Minimalny loop realtime: utworzenie „meczu demo” + inkrement/dekrement punktów
+- [x] Spójny system stylów CSS (dark theme, admin.css)
+- [x] Usunięto mecze demo - wszystkie mecze są częścią drabinki
 - [x] Widoki: `/admin`, `/display/fan`, `/overlay` (podstawowe)
 
 ## 1) Braki krytyczne – żeby to było „turniejowe”, nie demo
@@ -24,7 +25,7 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 - [x] Frontend: Bracket Editor (`/admin/bracket`) – manualne przypisania (na start: forma bez drag&drop)
 - [x] Frontend: Bracket Display (`/display/bracket`) – widok tylko do odczytu
 
-### Mecze „realne” (nie demo)
+### Mecze (pełna funkcjonalność)
 - [x] Backend: MatchService – start/end/reset, wybór zwycięzcy, aktualizacja statusu `pending/live/completed`
 - [x] Socket.io: `admin:match:start`, `admin:match:end`, `admin:match:reset`
 - [x] Frontend: Match Control (`/admin/match/:id`) – pełnoekranowa kontrola meczu
@@ -52,7 +53,7 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 - [ ] Obsługa błędów i UX: toasty/komunikaty
 
 ## 5) Jakość i „polish”
-- [ ] Keyboard shortcuts (np. A/L – punkt dla lewej/prawej)
+- [x] Keyboard shortcuts (np. A/L – punkt dla lewej/prawej)
 - [ ] Undo/redo (co najmniej dla scoringu)
 - [ ] Mobile-responsive admin
 - [ ] Cross-browser + test na wielu urządzeniach LAN
@@ -65,6 +66,7 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 ---
 
 # Plan prac (co robię teraz)
-1. Implementacja Teams (CRUD + eventy + `/admin/teams`) – daje realne dane zamiast "Drużyna 1/2".
-2. Minimalna drabinka + przypisanie drużyn + start meczu z drabinki.
-3. Match Control (`/admin/match/:id`) i domknięcie cyklu meczu.
+1. ✅ Usunięto mecze demo - wszystkie mecze są częścią turnieju
+2. ✅ Przepracowano Dashboard z workflow i nawigacją
+3. ✅ Dodano spójny system stylów (admin.css)
+4. Kolejne kroki: scoring modes, 3rd place match, overlay animations
