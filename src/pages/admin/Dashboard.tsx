@@ -174,27 +174,45 @@ export function Dashboard() {
             )}
           </div>
           {tournament ? (
-            <div className="form-row">
-              <div className="form-group" style={{ flex: 2 }}>
-                <label className="form-label">Nazwa turnieju</label>
-                <input
-                  className="form-input"
-                  value={tournamentName}
-                  onChange={(e) => setTournamentName(e.target.value)}
-                  placeholder="Nazwa turnieju"
-                />
+            <>
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 2 }}>
+                  <label className="form-label">Nazwa turnieju</label>
+                  <input
+                    className="form-input"
+                    value={tournamentName}
+                    onChange={(e) => setTournamentName(e.target.value)}
+                    placeholder="Nazwa turnieju"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 0 }}>
+                  <label className="form-label">&nbsp;</label>
+                  <button
+                    className="btn btn-primary"
+                    onClick={saveTournamentName}
+                    disabled={saving || tournamentName === tournament.name}
+                  >
+                    {saving ? 'Zapisywanie...' : 'Zapisz'}
+                  </button>
+                </div>
               </div>
-              <div className="form-group" style={{ flex: 0 }}>
-                <label className="form-label">&nbsp;</label>
-                <button
-                  className="btn btn-primary"
-                  onClick={saveTournamentName}
-                  disabled={saving || tournamentName === tournament.name}
-                >
-                  {saving ? 'Zapisywanie...' : 'Zapisz'}
-                </button>
+              <div className="flex gap-2" style={{ marginTop: 12 }}>
+                <Link to={`/admin/tournament/${tournament.id}`} className="btn btn-secondary btn-sm">
+                  ⚙️ Ustawienia punktacji
+                </Link>
+                <Link to="/admin/tournament/new" className="btn btn-secondary btn-sm">
+                  + Nowy turniej
+                </Link>
               </div>
-            </div>
+              {tournament.settings?.scoring && (
+                <div className="info-message" style={{ marginTop: 12 }}>
+                  <strong>Tryb:</strong>{' '}
+                  {tournament.settings.scoring.mode === 'sets'
+                    ? `Do ${tournament.settings.scoring.setsToWin} setów (po ${tournament.settings.scoring.pointsToWinSet} pkt)`
+                    : 'Tylko punkty'}
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-muted">Ładowanie...</div>
           )}

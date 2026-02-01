@@ -1,10 +1,22 @@
 import { create } from 'zustand'
 
+export type ScoringSettings = {
+  mode: 'sets' | 'points' | 'timed'
+  setsToWin: number
+  pointsToWinSet: number
+  pointsToWinTieBreak: number
+  mustWinByTwo: boolean
+}
+
+export type TournamentSettings = {
+  scoring: ScoringSettings
+}
+
 export type Tournament = {
   id: string
   name: string
   status: 'draft' | 'live' | 'completed'
-  settings: Record<string, unknown>
+  settings: TournamentSettings
 }
 
 export type Team = {

@@ -3,6 +3,7 @@ import { db } from '../db'
 import { bracketMatches, matchScores } from '../db/schema'
 import { id } from '../utils/id'
 import { listBracketMatches } from './bracket.service'
+import { getTournament, DEFAULT_SCORING_SETTINGS, type ScoringSettings } from './tournament.service'
 
 type MatchRow = InferSelectModel<typeof bracketMatches>
 type ScoreRow = InferSelectModel<typeof matchScores>
@@ -75,13 +76,24 @@ export async function getMatchScore(matchId: string): Promise<MatchScore | null>
   return rows[0] ? rowToScore(rows[0]) : null
 }
 
-export async function ensureMatchScore(matchId: string) {
+export async function ensureMatchScore(matchId: string, tournamentId?: string) {
   const existing = await getMatchScore(matchId)
   if (existing) return existing
+
+  // Get scoring settings from tournament
+  let scoringSettings: ScoringSettings = DEFAULT_SCORING_SETTINGS
+  if (tournamentId) {
+    const tournament = await getTournament(tournamentId)
+    if (tournament?.settings?.scoring) {
+      scoringSettings = tournament.settings.scoring
+    }
+  }
+
   await db.insert(matchScores).values({
     id: id('ms'),
     matchId,
-    scoringModeJson: JSON.stringify({ mode: 'points', pointsToWin: 25, mustWinByTwo: true }),
+    setsToWin: scoringSettings.setsToWin,
+    scoringModeJson: JSON.stringify(scoringSettings),
     updatedAt: Date.now(),
   })
   const created = await getMatchScore(matchId)
@@ -89,9 +101,13 @@ export async function ensureMatchScore(matchId: string) {
   return created
 }
 
-export async function resetMatchScore(matchId: string, opts?: { startedAt?: number | null; endedAt?: number | null }) {
+export async function resetMatchScore(matchId: string, opts?: { startedAt?: number | null; endedAt?: number | null; tournamentId?: string }) {
   const now = Date.now()
-  await ensureMatchScore(matchId)
+  await ensureMatchScore(matchId, opts?.tournamentId)
+
+  // Get setsToWin from existing score (which was created from tournament settings)
+  const existingScore = await getMatchScore(matchId)
+  const setsToWin = existingScore?.setsToWin ?? 2
 
   await db
     .update(matchScores)
@@ -99,7 +115,7 @@ export async function resetMatchScore(matchId: string, opts?: { startedAt?: numb
       team1Sets: 0,
       team2Sets: 0,
       currentSet: 1,
-      setsToWin: 2,
+      setsToWin,
       setScoresJson: '[]',
       team1CurrentPoints: 0,
       team2CurrentPoints: 0,
@@ -129,7 +145,7 @@ export async function startMatch(tournamentId: string, matchId: string) {
   if (otherLive.length > 0) return { ok: false as const, error: 'Jest już aktywny mecz (live)' }
 
   await db.update(bracketMatches).set({ status: 'live', updatedAt: now }).where(eq(bracketMatches.id, matchId))
-  await resetMatchScore(matchId, { startedAt: now, endedAt: null })
+  await resetMatchScore(matchId, { startedAt: now, endedAt: null, tournamentId })
 
   const updated = await getMatch(matchId)
   if (!updated) return { ok: false as const, error: 'Nie udało się uruchomić meczu' }
@@ -259,8 +275,8 @@ export async function resetMatch(tournamentId: string, matchId: string) {
 export async function incrementPoint(matchId: string, team: 'team1' | 'team2') {
   const score = await ensureMatchScore(matchId)
   
-  // Get scoring config
-  const config = score.scoringMode as { mode?: string; pointsToWin?: number; tieBreakPoints?: number } | null
+  // Get scoring config (structured as ScoringSettings)
+  const config = score.scoringMode as ScoringSettings | null
   const mode = config?.mode ?? 'sets' // Default to sets scoring
   
   if (mode === 'points') {
@@ -277,10 +293,10 @@ export async function incrementPoint(matchId: string, team: 'team1' | 'team2') {
   }
   
   // Volleyball sets mode
-  const setsToWin = score.setsToWin || 3
-  const isTieBreak = score.currentSet === (setsToWin * 2 - 1) // 5th set in best-of-5
-  const pointsToWin = isTieBreak ? (config?.tieBreakPoints ?? 15) : (config?.pointsToWin ?? 25)
-  const minAdvantage = 2
+  const setsToWin = config?.setsToWin ?? score.setsToWin ?? 2
+  const isTieBreak = score.currentSet === (setsToWin * 2 - 1) // 5th set in best-of-3 (set 3), or 5th set in best-of-5
+  const pointsToWin = isTieBreak ? (config?.pointsToWinTieBreak ?? 15) : (config?.pointsToWinSet ?? 25)
+  const minAdvantage = config?.mustWinByTwo ? 2 : 1
   
   let t1Points = score.team1CurrentPoints + (team === 'team1' ? 1 : 0)
   let t2Points = score.team2CurrentPoints + (team === 'team2' ? 1 : 0)
