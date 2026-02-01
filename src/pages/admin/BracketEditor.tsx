@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import { useToast } from '../../components/Toast'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -27,6 +28,7 @@ export function BracketEditor() {
   const { tournament, teams, setTournament, setTeams } = useTournamentStore()
   const [bracket, setBracket] = useState<BracketMatch[]>([])
   const [error, setError] = useState<string | null>(null)
+  const { addToast } = useToast()
 
   useEffect(() => {
     if (!socket) return
@@ -92,9 +94,11 @@ export function BracketEditor() {
     socket.emit('admin:bracket:generate', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
       if (!ack.ok) {
         setError(ack.error)
+        addToast(ack.error, 'error')
         return
       }
       setBracket(ack.data)
+      addToast('Drabinka wygenerowana pomyślnie', 'success')
     })
   }
 
@@ -105,9 +109,11 @@ export function BracketEditor() {
     socket.emit('admin:bracket:clear', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
       if (!ack.ok) {
         setError(ack.error)
+        addToast(ack.error, 'error')
         return
       }
       setBracket(ack.data)
+      addToast('Drabinka wyczyszczona', 'info')
     })
   }
 
@@ -120,6 +126,7 @@ export function BracketEditor() {
       (ack: Ack<BracketMatch[]>) => {
         if (!ack.ok) {
           setError(ack.error)
+          addToast(ack.error, 'error')
           return
         }
         setBracket(ack.data)
@@ -131,7 +138,12 @@ export function BracketEditor() {
     if (!socket || !tournament) return
     setError(null)
     socket.emit('admin:match:start', { tournamentId: tournament.id, matchId }, (ack: Ack<MatchAck>) => {
-      if (!ack.ok) setError(ack.error)
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
+        addToast('Mecz rozpoczęty', 'success')
+      }
     })
   }
 
@@ -139,7 +151,12 @@ export function BracketEditor() {
     if (!socket || !tournament) return
     setError(null)
     socket.emit('admin:match:end', { tournamentId: tournament.id, matchId, winnerId }, (ack: Ack<MatchAck>) => {
-      if (!ack.ok) setError(ack.error)
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
+        addToast('Mecz zakończony', 'success')
+      }
     })
   }
 
@@ -147,7 +164,12 @@ export function BracketEditor() {
     if (!socket || !tournament) return
     setError(null)
     socket.emit('admin:match:reset', { tournamentId: tournament.id, matchId }, (ack: Ack<MatchAck>) => {
-      if (!ack.ok) setError(ack.error)
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
+        addToast('Mecz zresetowany', 'info')
+      }
     })
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import { useToast } from '../../components/Toast'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -13,6 +14,7 @@ type Drafts = Record<string, TeamDraft>
 export function TeamsManager() {
   const { socket, connected } = useSocket()
   const { tournament, teams, setTournament, setTeams } = useTournamentStore()
+  const { addToast } = useToast()
 
   const [name, setName] = useState('')
   const [shortName, setShortName] = useState('')
@@ -56,10 +58,14 @@ export function TeamsManager() {
       'admin:team:create',
       { tournamentId: tournament.id, name: name.trim(), shortName: shortName.trim() || undefined, color: color.trim() || undefined },
       (ack: Ack<Team>) => {
-        if (!ack.ok) return
+        if (!ack.ok) {
+          addToast(ack.error, 'error')
+          return
+        }
         setName('')
         setShortName('')
         setColor('#f97316')
+        addToast(`Drużyna "${ack.data.name}" dodana`, 'success')
       },
     )
   }
@@ -70,12 +76,14 @@ export function TeamsManager() {
     if (!d) return
     socket.emit('admin:team:update', { teamId, patch: { name: d.name.trim(), shortName: d.shortName.trim() || null, color: d.color.trim() || null } })
     setEditingId(null)
+    addToast('Drużyna zaktualizowana', 'success')
   }
 
   const remove = (teamId: string) => {
     if (!socket) return
     if (!confirm('Czy na pewno chcesz usunąć tę drużynę?')) return
     socket.emit('admin:team:delete', { teamId })
+    addToast('Drużyna usunięta', 'info')
   }
 
   const cancelEdit = (teamId: string, team: Team) => {

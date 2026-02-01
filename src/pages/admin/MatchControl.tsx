@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import type { MatchScore } from '../../stores/match.store'
+import { useToast } from '../../components/Toast'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -27,6 +28,7 @@ export function MatchControl() {
 
   const { socket, connected } = useSocket()
   const { tournament, teams, setTournament, setTeams } = useTournamentStore()
+  const { addToast } = useToast()
 
   const [match, setMatch] = useState<BracketMatch | null>(null)
   const [score, setScore] = useState<MatchScore | null>(null)
@@ -121,10 +123,13 @@ export function MatchControl() {
     if (!socket || !tournament || !matchId) return
     setError(null)
     socket.emit('admin:match:start', { tournamentId: tournament.id, matchId }, (ack: Ack<BracketMatch>) => {
-      if (!ack.ok) setError(ack.error)
-      else {
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
         setMatch(ack.data)
         refreshScore()
+        addToast('Mecz rozpoczęty', 'success')
       }
     })
   }
@@ -133,10 +138,13 @@ export function MatchControl() {
     if (!socket || !tournament || !matchId) return
     setError(null)
     socket.emit('admin:match:end', { tournamentId: tournament.id, matchId, winnerId }, (ack: Ack<BracketMatch>) => {
-      if (!ack.ok) setError(ack.error)
-      else {
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
         setMatch(ack.data)
         refreshScore()
+        addToast('Mecz zakończony', 'success')
       }
     })
   }
@@ -145,10 +153,13 @@ export function MatchControl() {
     if (!socket || !tournament || !matchId) return
     setError(null)
     socket.emit('admin:match:reset', { tournamentId: tournament.id, matchId }, (ack: Ack<BracketMatch>) => {
-      if (!ack.ok) setError(ack.error)
-      else {
+      if (!ack.ok) {
+        setError(ack.error)
+        addToast(ack.error, 'error')
+      } else {
         setMatch(ack.data)
         refreshScore()
+        addToast('Mecz zresetowany', 'info')
       }
     })
   }
