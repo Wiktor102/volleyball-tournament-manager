@@ -102,6 +102,19 @@ export function FanView() {
               <span style={{ fontSize: 18 }}>MECZ NA ŻYWO</span>
             </div>
 
+            {/* Sets Score */}
+            {(score?.setsToWin ?? 3) > 1 && (
+              <div className="fan-sets">
+                <span className="fan-sets-score" style={{ color: team1?.color || undefined }}>
+                  {score?.team1Sets ?? 0}
+                </span>
+                <span className="fan-sets-label">SETY</span>
+                <span className="fan-sets-score" style={{ color: team2?.color || undefined }}>
+                  {score?.team2Sets ?? 0}
+                </span>
+              </div>
+            )}
+
             <div className="fan-score">
               <div className="fan-team">
                 <div className="fan-team-name" style={{ color: team1?.color || undefined }}>
@@ -120,8 +133,19 @@ export function FanView() {
               </div>
             </div>
 
+            {/* Set history */}
+            {score?.setScores && score.setScores.length > 0 && (
+              <div className="fan-set-history">
+                {score.setScores.map((s, i) => (
+                  <span key={i} className="fan-set-result">
+                    Set {i + 1}: <strong>{s.t1}</strong>-<strong>{s.t2}</strong>
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="text-center mt-3 text-muted">
-              Set {score?.currentSet ?? 1}
+              Set {score?.currentSet ?? 1} z {(score?.setsToWin ?? 3) * 2 - 1}
             </div>
           </>
         ) : (

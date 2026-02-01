@@ -798,6 +798,49 @@
   color: var(--color-text-dim);
 }
 
+.fan-sets {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  margin-bottom: 24px;
+}
+
+.fan-sets-score {
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.fan-sets-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.fan-set-history {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.fan-set-result {
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  color: var(--color-text-muted);
+}
+
 /* Overlay Styles */
 .overlay-page {
   width: 100vw;
@@ -846,6 +889,24 @@
 .overlay-separator {
   font-size: 32px;
   opacity: 0.5;
+}
+
+.overlay-sets {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 24px;
+  padding-right: 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.overlay-sets-label {
+  font-size: 12px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 /* Toast Notifications */

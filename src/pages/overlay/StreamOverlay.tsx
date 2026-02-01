@@ -95,6 +95,14 @@ export function StreamOverlay() {
             {team1?.name ?? 'DRUŻYNA 1'}
           </div>
           <div className="overlay-scores">
+            {/* Sets display */}
+            {(score?.setsToWin ?? 3) > 1 && (
+              <div className="overlay-sets">
+                <span style={{ color: team1?.color || '#ffffff' }}>{score?.team1Sets ?? 0}</span>
+                <span className="overlay-sets-label">SETY</span>
+                <span style={{ color: team2?.color || '#ffffff' }}>{score?.team2Sets ?? 0}</span>
+              </div>
+            )}
             <div className="overlay-score">{score?.team1CurrentPoints ?? 0}</div>
             <div className="overlay-separator">:</div>
             <div className="overlay-score">{score?.team2CurrentPoints ?? 0}</div>
