@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
@@ -12,8 +13,8 @@ type DemoPayload = {
 
 export function Dashboard() {
   const { socket, connected } = useSocket()
-  const { tournament, setTournament } = useTournamentStore()
-  const { matchId, score, setMatchId, setScore } = useMatchStore()
+  const { tournament, teams, setTournament, setTeams } = useTournamentStore()
+  const { matchId, team1Id, team2Id, score, setMatchId, setMatchTeams, setScore } = useMatchStore()
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -27,7 +28,11 @@ export function Dashboard() {
     const onMatchScore = (s: MatchScore) => setScore(s)
     const onState = (state: TournamentState) => {
       setTournament(state.tournament)
-      if (state.currentMatch?.id) setMatchId(state.currentMatch.id)
+      setTeams(state.teams)
+      if (state.currentMatch?.id) {
+        setMatchId(state.currentMatch.id)
+        setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null)
+      }
       if (state.score) setScore(state.score as MatchScore)
     }
 
@@ -40,7 +45,7 @@ export function Dashboard() {
       socket.off('match:score', onMatchScore)
       socket.off('tournament:state', onState)
     }
-  }, [socket, setTournament, setScore, setMatchId])
+  }, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams])
 
   const ensureDemoMatch = async () => {
     if (!socket || !tournament) return
@@ -63,9 +68,15 @@ export function Dashboard() {
     socket.emit('admin:score:decrement', { matchId, team })
   }
 
+  const team1Name = teams.find((t) => t.id === team1Id)?.name ?? 'Drużyna 1'
+  const team2Name = teams.find((t) => t.id === team2Id)?.name ?? 'Drużyna 2'
+
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui' }}>
-      <h1>Panel administratora</h1>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+        <h1 style={{ margin: 0 }}>Panel administratora</h1>
+        <Link to="/admin/teams">Drużyny →</Link>
+      </div>
       <div>Socket: {connected ? 'połączono' : 'rozłączono'}</div>
 
       <section style={{ marginTop: 16 }}>
@@ -93,13 +104,13 @@ export function Dashboard() {
             <div>Match ID: {matchId}</div>
             <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
               <div>
-                <h3>Drużyna 1</h3>
+                <h3>{team1Name}</h3>
                 <div style={{ fontSize: 48 }}>{score?.team1CurrentPoints ?? 0}</div>
                 <button onClick={() => dec('team1')}>-</button>{' '}
                 <button onClick={() => inc('team1')}>+</button>
               </div>
               <div>
-                <h3>Drużyna 2</h3>
+                <h3>{team2Name}</h3>
                 <div style={{ fontSize: 48 }}>{score?.team2CurrentPoints ?? 0}</div>
                 <button onClick={() => dec('team2')}>-</button>{' '}
                 <button onClick={() => inc('team2')}>+</button>

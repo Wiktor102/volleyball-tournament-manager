@@ -592,13 +592,13 @@ When multiple admins edit simultaneously:
 ## Workplan
 
 ### Phase 1: Project Foundation
-- [ ] Initialize Node.js project with TypeScript
-- [ ] Set up Vite + React + TypeScript frontend
+- [x] Initialize Node.js project with TypeScript
+- [x] Set up Vite + React + TypeScript frontend
 - [ ] Configure Tailwind CSS with custom theme
-- [ ] Set up Express server with Socket.io
-- [ ] Configure SQLite with Drizzle ORM
-- [ ] Create database schema and migrations
-- [ ] Set up monorepo scripts (concurrent dev server)
+- [x] Set up Express server with Socket.io
+- [x] Configure SQLite with Drizzle ORM
+- [x] Create database schema and migrations
+- [x] Set up monorepo scripts (concurrent dev server)
 
 ### Phase 2: Core Backend
 - [ ] Implement database models and services
@@ -616,13 +616,13 @@ When multiple admins edit simultaneously:
 - [ ] Add conflict resolution for concurrent edits
 
 ### Phase 3: Shared Infrastructure
-- [ ] Create Socket.io React context and hooks
-- [ ] Implement Zustand stores with Socket.io sync
+- [x] Create Socket.io React context and hooks
+- [x] Implement Zustand stores with Socket.io sync
 - [ ] Build base UI component library
   - [ ] Button, Input, Select, Modal
   - [ ] Card, Badge, Tabs
   - [ ] Loading states, error boundaries
-- [ ] Set up React Router with route structure
+- [x] Set up React Router with route structure
 
 ### Phase 4: Admin Interface
 - [ ] Admin Dashboard page
@@ -653,10 +653,10 @@ When multiple admins edit simultaneously:
 
 ### Phase 5: Display Views
 - [ ] Fan View (big screen display)
-  - [ ] Large score display
+  - [x] Large score display
   - [ ] Set history
   - [ ] Next match preview
-  - [ ] Auto-refresh on match change
+  - [x] Auto-refresh on match change
 - [ ] Player Info View
   - [ ] Current match status
   - [ ] "You're playing next" indicator
@@ -667,7 +667,7 @@ When multiple admins edit simultaneously:
   - [ ] Winner highlighting
 
 ### Phase 6: OBS Streaming Overlay
-- [ ] Overlay page with transparent background
+- [x] Overlay page with transparent background
 - [ ] Score bar component
   - [ ] Team names with colors
   - [ ] Set score

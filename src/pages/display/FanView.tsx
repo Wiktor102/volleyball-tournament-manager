@@ -7,8 +7,8 @@ type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export function FanView() {
   const { socket, connected } = useSocket()
-  const { tournament, setTournament } = useTournamentStore()
-  const { matchId, score, setMatchId, setScore } = useMatchStore()
+  const { tournament, teams, setTournament, setTeams } = useTournamentStore()
+  const { matchId, team1Id, team2Id, score, setMatchId, setMatchTeams, setScore } = useMatchStore()
 
   useEffect(() => {
     if (!socket) return
@@ -19,13 +19,20 @@ export function FanView() {
     })
 
     const onTournamentUpdated = (t: Tournament) => setTournament(t)
-    const onMatchStatus = (m: { id?: string }) => {
-      if (m?.id) setMatchId(m.id)
+    const onMatchStatus = (m: { id?: string; team1Id?: string | null; team2Id?: string | null }) => {
+      if (m?.id) {
+        setMatchId(m.id)
+        setMatchTeams(m.team1Id ?? null, m.team2Id ?? null)
+      }
     }
     const onMatchScore = (s: MatchScore) => setScore(s)
     const onState = (state: TournamentState) => {
       setTournament(state.tournament)
-      if (state.currentMatch?.id) setMatchId(state.currentMatch.id)
+      setTeams(state.teams)
+      if (state.currentMatch?.id) {
+        setMatchId(state.currentMatch.id)
+        setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null)
+      }
       if (state.score) setScore(state.score as MatchScore)
     }
 
@@ -40,7 +47,7 @@ export function FanView() {
       socket.off('match:score', onMatchScore)
       socket.off('tournament:state', onState)
     }
-  }, [socket, setTournament, setMatchId, setScore])
+  }, [socket, setTournament, setTeams, setMatchId, setMatchTeams, setScore])
 
   useEffect(() => {
     if (!socket || !matchId) return
@@ -50,6 +57,9 @@ export function FanView() {
     })
   }, [socket, matchId, setScore])
 
+  const team1 = teams.find((t) => t.id === team1Id)
+  const team2 = teams.find((t) => t.id === team2Id)
+
   return (
     <div style={{ fontFamily: 'system-ui', padding: 32 }}>
       <h1>{tournament?.name ?? 'Turniej'}</h1>
@@ -57,11 +67,11 @@ export function FanView() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
         <div>
-          <div style={{ fontSize: 24 }}>DRUŻYNA 1</div>
+          <div style={{ fontSize: 24, color: team1?.color ?? undefined }}>{team1?.name ?? 'DRUŻYNA 1'}</div>
           <div style={{ fontSize: 120, fontWeight: 700 }}>{score?.team1CurrentPoints ?? 0}</div>
         </div>
         <div>
-          <div style={{ fontSize: 24, textAlign: 'right' }}>DRUŻYNA 2</div>
+          <div style={{ fontSize: 24, textAlign: 'right', color: team2?.color ?? undefined }}>{team2?.name ?? 'DRUŻYNA 2'}</div>
           <div style={{ fontSize: 120, fontWeight: 700, textAlign: 'right' }}>
             {score?.team2CurrentPoints ?? 0}
           </div>

@@ -1,0 +1,16 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - heading "Drużyny" [level=1] [ref=e5]
+    - link "← Panel" [ref=e6] [cursor=pointer]:
+      - /url: /admin
+  - generic [ref=e7]: "Socket: połączono"
+  - generic [ref=e8]:
+    - heading "Dodaj drużynę" [level=2] [ref=e9]
+    - generic [ref=e10]:
+      - textbox "Nazwa" [ref=e11]
+      - textbox "Skrót" [ref=e12]
+      - textbox [ref=e13]: "#FF6B35"
+      - button "Dodaj" [disabled] [ref=e14] [cursor=pointer]
+  - generic [ref=e15]:
+    - heading "Lista" [level=2] [ref=e16]
+    - generic [ref=e17]: Brak drużyn.

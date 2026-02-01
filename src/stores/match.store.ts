@@ -14,14 +14,20 @@ export type MatchScore = {
 
 type State = {
   matchId: string | null
+  team1Id: string | null
+  team2Id: string | null
   score: MatchScore | null
   setMatchId: (id: string | null) => void
+  setMatchTeams: (team1Id: string | null, team2Id: string | null) => void
   setScore: (s: MatchScore | null) => void
 }
 
 export const useMatchStore = create<State>((set) => ({
   matchId: null,
+  team1Id: null,
+  team2Id: null,
   score: null,
   setMatchId: (matchId) => set({ matchId }),
+  setMatchTeams: (team1Id, team2Id) => set({ team1Id, team2Id }),
   setScore: (score) => set({ score }),
 }))
