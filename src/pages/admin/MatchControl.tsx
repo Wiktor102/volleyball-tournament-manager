@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
-import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import { useTournamentStore, type Team, type Tournament, type TournamentState, type ScoringSettings } from '../../stores/tournament.store'
 import type { MatchScore } from '../../stores/match.store'
 import { useToast } from '../../components/Toast'
 import '../../styles/admin.css'
@@ -33,6 +33,74 @@ export function MatchControl() {
   const [match, setMatch] = useState<BracketMatch | null>(null)
   const [score, setScore] = useState<MatchScore | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Timer state for timed mode
+  const [timerRunning, setTimerRunning] = useState(false)
+  const [localTime, setLocalTime] = useState(0)
+  const timerRef = useRef<number | null>(null)
+
+  const scoringMode = (score?.scoringMode as ScoringSettings | undefined)?.mode
+  const isTimedMode = scoringMode === 'timed'
+  const matchDuration = (score?.scoringMode as ScoringSettings | undefined)?.matchDurationMinutes ?? 10
+  const matchDurationSeconds = matchDuration * 60
+
+  // Timer effect
+  useEffect(() => {
+    if (timerRunning && isTimedMode) {
+      timerRef.current = window.setInterval(() => {
+        setLocalTime((prev) => prev + 1)
+      }, 1000)
+    }
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [timerRunning, isTimedMode])
+
+  // Sync local time from server score
+  useEffect(() => {
+    if (score?.matchTimeSeconds !== undefined) {
+      setLocalTime(score.matchTimeSeconds)
+    }
+  }, [score?.matchTimeSeconds])
+
+  // Sync timer to server periodically
+  const syncTimer = useCallback(() => {
+    if (!socket || !matchId || !timerRunning) return
+    socket.emit('admin:timer:update', { matchId, timeSeconds: localTime })
+  }, [socket, matchId, localTime, timerRunning])
+
+  useEffect(() => {
+    if (!timerRunning) return
+    const interval = setInterval(syncTimer, 5000)
+    return () => clearInterval(interval)
+  }, [timerRunning, syncTimer])
+
+  const toggleTimer = () => {
+    if (timerRunning) {
+      syncTimer()
+    }
+    setTimerRunning(!timerRunning)
+  }
+
+  const resetTimer = () => {
+    setTimerRunning(false)
+    setLocalTime(0)
+    if (socket && matchId) {
+      socket.emit('admin:timer:update', { matchId, timeSeconds: 0 })
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const timeRemaining = Math.max(0, matchDurationSeconds - localTime)
+  const isOvertime = localTime > matchDurationSeconds
 
   useEffect(() => {
     if (!socket) return
@@ -254,14 +322,59 @@ export function MatchControl() {
                 <span className={`status-badge ${match.status}`}>
                   {match.status === 'pending' ? 'Oczekuje' : match.status === 'live' ? 'Na żywo' : 'Zakończony'}
                 </span>
+                {scoringMode && (
+                  <>
+                    <span className="text-dim">•</span>
+                    <span className="text-muted">
+                      {scoringMode === 'sets' ? 'Sety' : scoringMode === 'points' ? 'Punkty' : 'Na czas'}
+                    </span>
+                  </>
+                )}
               </div>
-              <div className="text-dim" style={{ fontSize: 12 }}>Set: {score?.currentSet ?? 1}</div>
+              <div className="text-dim" style={{ fontSize: 12 }}>
+                {scoringMode !== 'timed' && `Set: ${score?.currentSet ?? 1}`}
+              </div>
             </div>
+
+            {/* Timer Display for Timed Mode */}
+            {isTimedMode && (
+              <div className="card">
+                <div className="timer-display" style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ 
+                    fontSize: '4rem', 
+                    fontFamily: 'monospace', 
+                    fontWeight: 'bold',
+                    color: isOvertime ? 'var(--danger-color)' : timeRemaining < 60 ? 'var(--warning-color)' : 'inherit'
+                  }}>
+                    {isOvertime ? `+${formatTime(localTime - matchDurationSeconds)}` : formatTime(timeRemaining)}
+                  </div>
+                  <div className="text-muted" style={{ marginBottom: '1rem' }}>
+                    {isOvertime ? 'DOGRYWKA' : `z ${matchDuration} minut`}
+                  </div>
+                  <div className="btn-group" style={{ justifyContent: 'center' }}>
+                    <button 
+                      className={`btn ${timerRunning ? 'btn-warning' : 'btn-success'} btn-lg`}
+                      onClick={toggleTimer}
+                      disabled={!canScore}
+                    >
+                      {timerRunning ? '⏸ Pauza' : '▶ Start'}
+                    </button>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={resetTimer}
+                      disabled={timerRunning}
+                    >
+                      ↺ Reset czasu
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Score Display */}
             <div className="card">
               {/* Sets Display */}
-              {(score?.setsToWin ?? 3) > 1 && (
+              {scoringMode === 'sets' && (score?.setsToWin ?? 3) > 1 && (
                 <div className="sets-display">
                   <div className="sets-score">
                     <span style={{ color: t1?.color || undefined }}>{score?.team1Sets ?? 0}</span>
@@ -317,8 +430,8 @@ export function MatchControl() {
                 </div>
               </div>
 
-              {/* Set Controls */}
-              {canScore && (
+              {/* Set Controls - only for sets mode */}
+              {canScore && scoringMode === 'sets' && (
                 <div className="set-controls">
                   <button className="btn btn-secondary" onClick={() => awardSetToTeam('team1')}>
                     Przyznaj set: {t1?.shortName || t1?.name || 'D1'}
@@ -339,26 +452,26 @@ export function MatchControl() {
                 <h2>Kontrola meczu</h2>
               </div>
               <div className="btn-group">
-                <button className="btn btn-success btn-lg" disabled={!canStart} onClick={start}>
+                <button className="btn btn-success btn-lg" disabled={!canStart} onClick={() => { start(); if (isTimedMode) setTimerRunning(false); }}>
                   ▶ Rozpocznij mecz
                 </button>
 
                 <button
                   className="btn btn-primary btn-lg"
                   disabled={match.status !== 'live' || !match.team1Id}
-                  onClick={() => end(match.team1Id!)}
+                  onClick={() => { syncTimer(); end(match.team1Id!); }}
                 >
                   🏆 Wygrywa {t1?.shortName || t1?.name || 'Drużyna 1'}
                 </button>
                 <button
                   className="btn btn-primary btn-lg"
                   disabled={match.status !== 'live' || !match.team2Id}
-                  onClick={() => end(match.team2Id!)}
+                  onClick={() => { syncTimer(); end(match.team2Id!); }}
                 >
                   🏆 Wygrywa {t2?.shortName || t2?.name || 'Drużyna 2'}
                 </button>
 
-                <button className="btn btn-danger btn-lg" onClick={reset}>
+                <button className="btn btn-danger btn-lg" onClick={() => { setTimerRunning(false); reset(); }}>
                   ↺ Resetuj mecz
                 </button>
               </div>

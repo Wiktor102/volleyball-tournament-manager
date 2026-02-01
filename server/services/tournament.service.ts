@@ -9,10 +9,21 @@ export type ScoringSettings = {
   pointsToWinSet: number
   pointsToWinTieBreak: number
   mustWinByTwo: boolean
+  // Timed mode settings
+  matchDurationMinutes?: number
+  overtimeMinutes?: number
+  goldenGoal?: boolean
+}
+
+// Round-specific scoring override (partial - inherits from default)
+export type RoundScoringOverride = {
+  round: number | 'final' | 'semifinal' | 'thirdPlace'
+  settings: Partial<ScoringSettings>
 }
 
 export type TournamentSettings = {
   scoring: ScoringSettings
+  roundOverrides?: RoundScoringOverride[]
 }
 
 export const DEFAULT_SCORING_SETTINGS: ScoringSettings = {
@@ -21,6 +32,9 @@ export const DEFAULT_SCORING_SETTINGS: ScoringSettings = {
   pointsToWinSet: 25,
   pointsToWinTieBreak: 15,
   mustWinByTwo: true,
+  matchDurationMinutes: 10,
+  overtimeMinutes: 2,
+  goldenGoal: true,
 }
 
 export type Tournament = {
@@ -42,6 +56,7 @@ function rowToTournament(row: TournamentRow): Tournament {
       ...DEFAULT_SCORING_SETTINGS,
       ...(rawSettings.scoring ?? {}),
     },
+    roundOverrides: rawSettings.roundOverrides ?? [],
   }
   return {
     id: row.id,
@@ -58,6 +73,42 @@ export async function getTournament(tournamentId: string): Promise<Tournament | 
   return rows[0] ? rowToTournament(rows[0]) : null
 }
 
+/**
+ * Get scoring settings for a specific round.
+ * Round numbers: positive = actual round (1, 2, 3...), -1 = final, -2 = semifinal, 0 = 3rd place match
+ * Falls back to tournament default if no override exists.
+ */
+export function getScoringForRound(
+  settings: TournamentSettings,
+  roundNumber: number,
+  totalRounds: number,
+  isThirdPlaceMatch: boolean
+): ScoringSettings {
+  const base = settings.scoring
+  
+  // Determine which override key to look for
+  let lookupKey: number | 'final' | 'semifinal' | 'thirdPlace'
+  if (isThirdPlaceMatch) {
+    lookupKey = 'thirdPlace'
+  } else if (roundNumber === totalRounds) {
+    lookupKey = 'final'
+  } else if (roundNumber === totalRounds - 1 && totalRounds > 1) {
+    lookupKey = 'semifinal'
+  } else {
+    lookupKey = roundNumber
+  }
+  
+  // Find override
+  const override = settings.roundOverrides?.find(o => o.round === lookupKey)
+  if (!override) return base
+  
+  // Merge override with base
+  return {
+    ...base,
+    ...override.settings,
+  }
+}
+
 export async function createTournament(input: { name: string; settings?: Partial<TournamentSettings> }) {
   const now = Date.now()
   const tournamentId = id('t')
@@ -66,6 +117,7 @@ export async function createTournament(input: { name: string; settings?: Partial
       ...DEFAULT_SCORING_SETTINGS,
       ...(input.settings?.scoring ?? {}),
     },
+    roundOverrides: input.settings?.roundOverrides,
   }
   await db.insert(tournaments).values({
     id: tournamentId,
@@ -94,6 +146,7 @@ export async function updateTournament(
       ...existing.settings.scoring,
       ...(patch.settings?.scoring ?? {}),
     },
+    roundOverrides: patch.settings?.roundOverrides ?? existing.settings.roundOverrides,
   }
 
   await db

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
-import { useTournamentStore, type Tournament, type ScoringSettings, type TournamentSettings } from '../../stores/tournament.store'
+import { useTournamentStore, type Tournament, type ScoringSettings, type TournamentSettings, type RoundScoringOverride } from '../../stores/tournament.store'
 import { useToast } from '../../components/Toast'
 import { useConfirm } from '../../components/ConfirmModal'
 import '../../styles/admin.css'
@@ -14,6 +14,9 @@ const DEFAULT_SCORING: ScoringSettings = {
   pointsToWinSet: 25,
   pointsToWinTieBreak: 15,
   mustWinByTwo: true,
+  matchDurationMinutes: 10,
+  overtimeMinutes: 2,
+  goldenGoal: true,
 }
 
 export function TournamentSetup() {
@@ -31,6 +34,7 @@ export function TournamentSetup() {
   const [name, setName] = useState('')
   const [status, setStatus] = useState<Tournament['status']>('draft')
   const [scoring, setScoring] = useState<ScoringSettings>(DEFAULT_SCORING)
+  const [roundOverrides, setRoundOverrides] = useState<RoundScoringOverride[]>([])
   const [originalTournament, setOriginalTournament] = useState<Tournament | null>(null)
 
   // Load existing tournament
@@ -48,6 +52,7 @@ export function TournamentSetup() {
       setName(ack.data.name)
       setStatus(ack.data.status)
       setScoring(ack.data.settings?.scoring ?? DEFAULT_SCORING)
+      setRoundOverrides(ack.data.settings?.roundOverrides ?? [])
     })
   }, [socket, id, isNew, navigate, addToast])
 
@@ -55,7 +60,10 @@ export function TournamentSetup() {
     if (!socket || !name.trim()) return
 
     setSaving(true)
-    const settings: TournamentSettings = { scoring }
+    const settings: TournamentSettings = { 
+      scoring,
+      roundOverrides: roundOverrides.length > 0 ? roundOverrides : undefined
+    }
 
     if (isNew) {
       socket.emit('admin:tournament:create', { name: name.trim(), settings }, (ack: Ack<Tournament>) => {
@@ -84,7 +92,7 @@ export function TournamentSetup() {
         }
       )
     }
-  }, [socket, name, scoring, status, isNew, id, setTournament, addToast, navigate])
+  }, [socket, name, scoring, roundOverrides, status, isNew, id, setTournament, addToast, navigate])
 
   const handleDelete = useCallback(async () => {
     if (!socket || !id || isNew) return
@@ -124,7 +132,8 @@ export function TournamentSetup() {
   const hasChanges = isNew || 
     name !== originalTournament?.name ||
     status !== originalTournament?.status ||
-    JSON.stringify(scoring) !== JSON.stringify(originalTournament?.settings?.scoring ?? DEFAULT_SCORING)
+    JSON.stringify(scoring) !== JSON.stringify(originalTournament?.settings?.scoring ?? DEFAULT_SCORING) ||
+    JSON.stringify(roundOverrides) !== JSON.stringify(originalTournament?.settings?.roundOverrides ?? [])
 
   return (
     <div className="admin-page">
@@ -184,7 +193,8 @@ export function TournamentSetup() {
         {/* Scoring Settings */}
         <div className="card">
           <div className="card-header">
-            <h2>Ustawienia punktacji</h2>
+            <h2>Ustawienia punktacji (domyślne)</h2>
+            <span className="text-muted text-sm">Te ustawienia będą używane dla wszystkich rund, chyba że zostaną nadpisane poniżej.</span>
           </div>
 
           <div className="form-group">
@@ -201,6 +211,12 @@ export function TournamentSetup() {
                 onClick={() => updateScoring({ mode: 'points' })}
               >
                 Tylko punkty
+              </button>
+              <button
+                className={`btn btn-sm ${scoring.mode === 'timed' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => updateScoring({ mode: 'timed' })}
+              >
+                Na czas
               </button>
             </div>
           </div>
@@ -282,6 +298,191 @@ export function TournamentSetup() {
               <strong>Tryb prosty:</strong> Licznik punktów bez setów. Admin ręcznie kończy mecz i wybiera zwycięzcę.
             </div>
           )}
+
+          {scoring.mode === 'timed' && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Czas meczu (minuty)</label>
+                  <select
+                    className="form-input"
+                    value={scoring.matchDurationMinutes ?? 10}
+                    onChange={(e) => updateScoring({ matchDurationMinutes: Number(e.target.value) })}
+                  >
+                    <option value={5}>5 minut</option>
+                    <option value={7}>7 minut</option>
+                    <option value={10}>10 minut</option>
+                    <option value={15}>15 minut</option>
+                    <option value={20}>20 minut</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Dogrywka (minuty)</label>
+                  <select
+                    className="form-input"
+                    value={scoring.overtimeMinutes ?? 2}
+                    onChange={(e) => updateScoring({ overtimeMinutes: Number(e.target.value) })}
+                  >
+                    <option value={0}>Brak dogrywki</option>
+                    <option value={1}>1 minuta</option>
+                    <option value={2}>2 minuty</option>
+                    <option value={3}>3 minuty</option>
+                    <option value={5}>5 minut</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Złoty gol (pierwszy punkt w dogrywce wygrywa)</label>
+                <div className="btn-group">
+                  <button
+                    className={`btn btn-sm ${scoring.goldenGoal ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => updateScoring({ goldenGoal: true })}
+                  >
+                    Tak
+                  </button>
+                  <button
+                    className={`btn btn-sm ${!scoring.goldenGoal ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => updateScoring({ goldenGoal: false })}
+                  >
+                    Nie
+                  </button>
+                </div>
+              </div>
+
+              <div className="info-message">
+                <strong>Tryb na czas:</strong> Mecz trwa {scoring.matchDurationMinutes ?? 10} minut. 
+                {(scoring.overtimeMinutes ?? 0) > 0 
+                  ? ` Przy remisie - dogrywka ${scoring.overtimeMinutes} min${scoring.goldenGoal ? ' (złoty gol)' : ''}.`
+                  : ' Bez dogrywki - przy remisie admin wybiera zwycięzcę.'
+                }
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Round Overrides */}
+        <div className="card">
+          <div className="card-header">
+            <h2>Nadpisania dla rund</h2>
+            <span className="text-muted text-sm">Ustaw inne zasady punktacji dla wybranych rund (np. finał na czas).</span>
+          </div>
+
+          {roundOverrides.map((override, index) => (
+            <div key={index} className="round-override-row" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+              <div className="flex gap-2 items-center" style={{ marginBottom: '0.5rem' }}>
+                <select
+                  className="form-input"
+                  value={override.round}
+                  onChange={(e) => {
+                    const newOverrides = [...roundOverrides]
+                    newOverrides[index].round = e.target.value as RoundScoringOverride['round']
+                    setRoundOverrides(newOverrides)
+                  }}
+                  style={{ width: 'auto' }}
+                >
+                  <option value="final">Finał</option>
+                  <option value="semifinal">Półfinały</option>
+                  <option value="thirdPlace">Mecz o 3. miejsce</option>
+                  <option value={1}>Runda 1</option>
+                  <option value={2}>Runda 2</option>
+                  <option value={3}>Runda 3</option>
+                </select>
+                <span className="text-muted">→</span>
+                <select
+                  className="form-input"
+                  value={override.settings.mode ?? scoring.mode}
+                  onChange={(e) => {
+                    const newOverrides = [...roundOverrides]
+                    newOverrides[index].settings = { ...newOverrides[index].settings, mode: e.target.value as ScoringSettings['mode'] }
+                    setRoundOverrides(newOverrides)
+                  }}
+                  style={{ width: 'auto' }}
+                >
+                  <option value="sets">Sety</option>
+                  <option value="points">Punkty</option>
+                  <option value="timed">Na czas</option>
+                </select>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => setRoundOverrides(roundOverrides.filter((_, i) => i !== index))}
+                >
+                  Usuń
+                </button>
+              </div>
+              
+              {(override.settings.mode ?? scoring.mode) === 'timed' && (
+                <div className="flex gap-2" style={{ marginTop: '0.5rem' }}>
+                  <label className="flex items-center gap-1 text-sm">
+                    Czas:
+                    <select
+                      className="form-input form-input-sm"
+                      value={override.settings.matchDurationMinutes ?? scoring.matchDurationMinutes ?? 10}
+                      onChange={(e) => {
+                        const newOverrides = [...roundOverrides]
+                        newOverrides[index].settings = { ...newOverrides[index].settings, matchDurationMinutes: Number(e.target.value) }
+                        setRoundOverrides(newOverrides)
+                      }}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value={5}>5 min</option>
+                      <option value={7}>7 min</option>
+                      <option value={10}>10 min</option>
+                      <option value={15}>15 min</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1 text-sm">
+                    Dogrywka:
+                    <select
+                      className="form-input form-input-sm"
+                      value={override.settings.overtimeMinutes ?? scoring.overtimeMinutes ?? 2}
+                      onChange={(e) => {
+                        const newOverrides = [...roundOverrides]
+                        newOverrides[index].settings = { ...newOverrides[index].settings, overtimeMinutes: Number(e.target.value) }
+                        setRoundOverrides(newOverrides)
+                      }}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value={0}>brak</option>
+                      <option value={1}>1 min</option>
+                      <option value={2}>2 min</option>
+                      <option value={3}>3 min</option>
+                    </select>
+                  </label>
+                </div>
+              )}
+              
+              {(override.settings.mode ?? scoring.mode) === 'sets' && (
+                <div className="flex gap-2" style={{ marginTop: '0.5rem' }}>
+                  <label className="flex items-center gap-1 text-sm">
+                    Sety:
+                    <select
+                      className="form-input form-input-sm"
+                      value={override.settings.setsToWin ?? scoring.setsToWin}
+                      onChange={(e) => {
+                        const newOverrides = [...roundOverrides]
+                        newOverrides[index].settings = { ...newOverrides[index].settings, setsToWin: Number(e.target.value) }
+                        setRoundOverrides(newOverrides)
+                      }}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value={1}>do 1</option>
+                      <option value={2}>do 2</option>
+                      <option value={3}>do 3</option>
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <button
+            className="btn btn-secondary"
+            onClick={() => setRoundOverrides([...roundOverrides, { round: 'final', settings: { mode: 'timed' } }])}
+          >
+            + Dodaj nadpisanie dla rundy
+          </button>
         </div>
 
         {/* Actions */}

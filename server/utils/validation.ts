@@ -71,6 +71,11 @@ export const SetUndoSchema = z.object({
   matchId: z.string().min(1),
 })
 
+export const TimerUpdateSchema = z.object({
+  matchId: z.string().min(1),
+  timeSeconds: z.number().min(0),
+})
+
 export const MatchStartSchema = z.object({
   tournamentId: z.string().min(1),
   matchId: z.string().min(1),

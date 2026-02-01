@@ -6,10 +6,20 @@ export type ScoringSettings = {
   pointsToWinSet: number
   pointsToWinTieBreak: number
   mustWinByTwo: boolean
+  // Timed mode settings
+  matchDurationMinutes?: number
+  overtimeMinutes?: number
+  goldenGoal?: boolean
+}
+
+export type RoundScoringOverride = {
+  round: number | 'final' | 'semifinal' | 'thirdPlace'
+  settings: Partial<ScoringSettings>
 }
 
 export type TournamentSettings = {
   scoring: ScoringSettings
+  roundOverrides?: RoundScoringOverride[]
 }
 
 export type Tournament = {

@@ -3,7 +3,7 @@ import { db } from '../db'
 import { bracketMatches, matchScores } from '../db/schema'
 import { id } from '../utils/id'
 import { listBracketMatches } from './bracket.service'
-import { getTournament, DEFAULT_SCORING_SETTINGS, type ScoringSettings } from './tournament.service'
+import { getTournament, getScoringForRound, DEFAULT_SCORING_SETTINGS, type ScoringSettings } from './tournament.service'
 
 type MatchRow = InferSelectModel<typeof bracketMatches>
 type ScoreRow = InferSelectModel<typeof matchScores>
@@ -33,7 +33,8 @@ export type MatchScore = {
   currentSet: number
   setsToWin: number
   setScores: Array<{ t1: number; t2: number }>
-  scoringMode: Record<string, unknown>
+  scoringMode: ScoringSettings | null
+  matchTimeSeconds: number
 }
 
 function rowToMatch(row: MatchRow): Match {
@@ -63,6 +64,7 @@ function rowToScore(row: ScoreRow): MatchScore {
     setsToWin: row.setsToWin,
     setScores: JSON.parse(row.setScoresJson ?? '[]'),
     scoringMode: JSON.parse(row.scoringModeJson ?? '{}'),
+    matchTimeSeconds: row.matchTimeSeconds ?? 0,
   }
 }
 
@@ -80,12 +82,25 @@ export async function ensureMatchScore(matchId: string, tournamentId?: string) {
   const existing = await getMatchScore(matchId)
   if (existing) return existing
 
-  // Get scoring settings from tournament
+  // Get the match to know its round
+  const match = await getMatch(matchId)
+  
+  // Get scoring settings - check for round override
   let scoringSettings: ScoringSettings = DEFAULT_SCORING_SETTINGS
   if (tournamentId) {
     const tournament = await getTournament(tournamentId)
-    if (tournament?.settings?.scoring) {
-      scoringSettings = tournament.settings.scoring
+    if (tournament?.settings) {
+      // Calculate total rounds from bracket
+      const allMatches = await listBracketMatches(tournamentId)
+      const totalRounds = Math.max(...allMatches.filter(m => !m.isThirdPlaceMatch).map(m => m.roundNumber), 1)
+      
+      // Get round-specific scoring
+      scoringSettings = getScoringForRound(
+        tournament.settings,
+        match?.roundNumber ?? 1,
+        totalRounds,
+        match?.isThirdPlaceMatch ?? false
+      )
     }
   }
 
@@ -279,8 +294,8 @@ export async function incrementPoint(matchId: string, team: 'team1' | 'team2') {
   const config = score.scoringMode as ScoringSettings | null
   const mode = config?.mode ?? 'sets' // Default to sets scoring
   
-  if (mode === 'points') {
-    // Simple points-only mode - just increment
+  if (mode === 'points' || mode === 'timed') {
+    // Simple points mode or timed mode - just increment (timer handled separately)
     const next = {
       team1CurrentPoints: score.team1CurrentPoints + (team === 'team1' ? 1 : 0),
       team2CurrentPoints: score.team2CurrentPoints + (team === 'team2' ? 1 : 0),
@@ -400,6 +415,19 @@ export async function undoSet(matchId: string) {
       team2CurrentPoints: lastSet.t2,
       currentSet: Math.max(1, score.currentSet - 1),
       setScoresJson: JSON.stringify(setScores),
+      updatedAt: Date.now(),
+    })
+    .where(eq(matchScores.matchId, matchId))
+  
+  return await getMatchScore(matchId)
+}
+
+// Update match timer (for timed mode)
+export async function updateMatchTime(matchId: string, timeSeconds: number) {
+  await db
+    .update(matchScores)
+    .set({
+      matchTimeSeconds: timeSeconds,
       updatedAt: Date.now(),
     })
     .where(eq(matchScores.matchId, matchId))
