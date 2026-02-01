@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Tournament, type ScoringSettings, type TournamentSettings } from '../../stores/tournament.store'
 import { useToast } from '../../components/Toast'
+import { useConfirm } from '../../components/ConfirmModal'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -21,6 +22,7 @@ export function TournamentSetup() {
   const { socket, connected, reconnecting } = useSocket()
   const { setTournament } = useTournamentStore()
   const { addToast } = useToast()
+  const confirm = useConfirm()
 
   const isNew = !id || id === 'new'
 
@@ -84,9 +86,16 @@ export function TournamentSetup() {
     }
   }, [socket, name, scoring, status, isNew, id, setTournament, addToast, navigate])
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!socket || !id || isNew) return
-    if (!confirm('Czy na pewno chcesz usunąć ten turniej? Ta operacja jest nieodwracalna i usunie wszystkie drużyny i mecze.')) return
+    const confirmed = await confirm({
+      title: 'Usuń turniej',
+      message: 'Czy na pewno chcesz usunąć ten turniej? Ta operacja jest nieodwracalna i usunie wszystkie drużyny, zawodników i mecze.',
+      confirmText: 'Usuń turniej',
+      danger: true,
+      requireTypedConfirmation: 'USUŃ',
+    })
+    if (!confirmed) return
 
     socket.emit('admin:tournament:delete', { tournamentId: id }, (ack: { ok: boolean; error?: string }) => {
       if (!ack.ok) {
@@ -96,7 +105,7 @@ export function TournamentSetup() {
       addToast('Turniej usunięty', 'success')
       navigate('/admin')
     })
-  }, [socket, id, isNew, addToast, navigate])
+  }, [socket, id, isNew, confirm, addToast, navigate])
 
   const updateScoring = (patch: Partial<ScoringSettings>) => {
     setScoring((prev) => ({ ...prev, ...patch }))

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from "../../stores/tournament.store";
 import { useToast } from "../../components/Toast";
+import { useConfirm } from "../../components/ConfirmModal";
 import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -25,6 +26,7 @@ export function TeamsManager() {
 	const { socket, connected } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const { addToast } = useToast();
+	const confirm = useConfirm();
 
 	const [name, setName] = useState("");
 	const [shortName, setShortName] = useState("");
@@ -131,9 +133,15 @@ export function TeamsManager() {
 		addToast("Drużyna zaktualizowana", "success");
 	};
 
-	const remove = (teamId: string) => {
+	const remove = async (teamId: string, teamName: string) => {
 		if (!socket) return;
-		if (!confirm("Czy na pewno chcesz usunąć tę drużynę?")) return;
+		const confirmed = await confirm({
+			title: "Usuń drużynę",
+			message: `Czy na pewno chcesz usunąć drużynę "${teamName}"? Ta operacja jest nieodwracalna i usunie również wszystkich zawodników.`,
+			confirmText: "Usuń drużynę",
+			danger: true,
+		});
+		if (!confirmed) return;
 		socket.emit("admin:team:delete", { teamId });
 		addToast("Drużyna usunięta", "info");
 	};
@@ -370,7 +378,7 @@ export function TeamsManager() {
 													>
 														Edytuj
 													</button>
-													<button className="btn btn-danger btn-sm" onClick={() => remove(t.id)}>
+													<button className="btn btn-danger btn-sm" onClick={() => remove(t.id, t.name)}>
 														Usuń
 													</button>
 												</div>

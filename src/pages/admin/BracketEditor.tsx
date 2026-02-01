@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import { useToast } from '../../components/Toast'
+import { useConfirm } from '../../components/ConfirmModal'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -29,6 +30,7 @@ export function BracketEditor() {
   const [bracket, setBracket] = useState<BracketMatch[]>([])
   const [error, setError] = useState<string | null>(null)
   const { addToast } = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     if (!socket) return
@@ -102,9 +104,15 @@ export function BracketEditor() {
     })
   }
 
-  const clear = () => {
+  const clear = async () => {
     if (!socket || !tournament) return
-    if (!confirm('Czy na pewno chcesz wyczyścić drabinkę? Ta operacja jest nieodwracalna.')) return
+    const confirmed = await confirm({
+      title: 'Wyczyść drabinkę',
+      message: 'Czy na pewno chcesz wyczyścić całą drabinkę? Ta operacja jest nieodwracalna i usunie wszystkie mecze i wyniki.',
+      confirmText: 'Wyczyść',
+      danger: true,
+    })
+    if (!confirmed) return
     setError(null)
     socket.emit('admin:bracket:clear', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
       if (!ack.ok) {
@@ -160,8 +168,15 @@ export function BracketEditor() {
     })
   }
 
-  const reset = (matchId: string) => {
+  const reset = async (matchId: string, matchInfo: string) => {
     if (!socket || !tournament) return
+    const confirmed = await confirm({
+      title: 'Resetuj mecz',
+      message: `Czy na pewno chcesz zresetować mecz ${matchInfo}? Wynik zostanie wyzerowany, a mecz wróci do stanu oczekującego.`,
+      confirmText: 'Resetuj',
+      danger: true,
+    })
+    if (!confirmed) return
     setError(null)
     socket.emit('admin:match:reset', { tournamentId: tournament.id, matchId }, (ack: Ack<MatchAck>) => {
       if (!ack.ok) {
@@ -178,6 +193,14 @@ export function BracketEditor() {
     if (round === totalRounds - 1) return 'Półfinały'
     if (round === totalRounds - 2) return 'Ćwierćfinały'
     return `Runda ${round}`
+  }
+
+  const getMatchDescription = (m: BracketMatch) => {
+    const t1 = teams.find((t) => t.id === m.team1Id)
+    const t2 = teams.find((t) => t.id === m.team2Id)
+    const t1Name = t1?.shortName || t1?.name || 'TBD'
+    const t2Name = t2?.shortName || t2?.name || 'TBD'
+    return `${t1Name} vs ${t2Name}`
   }
 
   const totalRounds = Math.max(...rounds.map((r) => r.round), 0)
@@ -325,13 +348,13 @@ export function BracketEditor() {
                               >
                                 Wygrywa {t2?.shortName || t2?.name || 'D2'}
                               </button>
-                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id)}>
+                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                                 Reset
                               </button>
                             </>
                           )}
                           {m.status === 'completed' && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id)}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                               Resetuj mecz
                             </button>
                           )}
@@ -401,13 +424,13 @@ export function BracketEditor() {
                               >
                                 Wygrywa {t2?.shortName || t2?.name || 'D2'}
                               </button>
-                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id)}>
+                              <button className="btn btn-danger btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                                 Reset
                               </button>
                             </>
                           )}
                           {m.status === 'completed' && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id)}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                               Resetuj mecz
                             </button>
                           )}
