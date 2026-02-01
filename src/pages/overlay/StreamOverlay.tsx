@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
@@ -7,9 +7,25 @@ import '../../styles/admin.css'
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export function StreamOverlay() {
-  const { socket, connected } = useSocket()
+  const { socket, connected, onReconnect } = useSocket()
   const { teams, setTournament, setTeams } = useTournamentStore()
   const { matchId, team1Id, team2Id, score, setMatchId, setMatchTeams, setScore } = useMatchStore()
+
+  // Function to refresh all state from server
+  const refreshState = useCallback(() => {
+    if (!socket) return
+    socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
+      if (!ack.ok) return
+      setTournament(ack.data)
+    })
+  }, [socket, setTournament])
+
+  // Subscribe to reconnect events
+  useEffect(() => {
+    return onReconnect(() => {
+      refreshState()
+    })
+  }, [onReconnect, refreshState])
 
   useEffect(() => {
     if (!socket) return

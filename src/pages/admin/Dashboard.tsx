@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
+import { useToast } from '../../components/Toast'
 import '../../styles/admin.css'
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -22,12 +23,36 @@ type BracketMatch = {
 }
 
 export function Dashboard() {
-  const { socket, connected } = useSocket()
+  const { socket, connected, reconnecting, onReconnect } = useSocket()
   const { tournament, teams, setTournament, setTeams } = useTournamentStore()
   const { setMatchId, setMatchTeams, setScore } = useMatchStore()
+  const { addToast } = useToast()
   const [tournamentName, setTournamentName] = useState('')
   const [bracket, setBracket] = useState<BracketMatch[]>([])
   const [saving, setSaving] = useState(false)
+
+  // Function to refresh all state from server
+  const refreshState = useCallback(() => {
+    if (!socket) return
+    socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
+      if (!ack.ok) return
+      setTournament(ack.data)
+      setTournamentName(ack.data.name)
+      
+      // Load bracket
+      socket.emit('bracket:list', { tournamentId: ack.data.id }, (bracketAck: Ack<BracketMatch[]>) => {
+        if (bracketAck.ok) setBracket(bracketAck.data)
+      })
+    })
+  }, [socket, setTournament])
+
+  // Subscribe to reconnect events
+  useEffect(() => {
+    return onReconnect(() => {
+      refreshState()
+      addToast('Połączono ponownie - odświeżam stan', 'info')
+    })
+  }, [onReconnect, refreshState, addToast])
 
   useEffect(() => {
     if (!socket) return
@@ -107,8 +132,8 @@ export function Dashboard() {
         <header className="admin-header">
           <div className="flex items-center gap-2">
             <h1>🏐 Panel administratora</h1>
-            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
-              {connected ? 'Połączono' : 'Rozłączono'}
+            <span className={`status-badge ${connected ? 'connected' : reconnecting ? 'reconnecting' : 'disconnected'}`}>
+              {connected ? 'Połączono' : reconnecting ? 'Łączenie...' : 'Rozłączono'}
             </span>
           </div>
           <nav className="admin-nav">

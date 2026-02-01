@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useMatchStore, type MatchScore } from '../../stores/match.store'
@@ -8,9 +8,25 @@ import '../../styles/admin.css'
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export function FanView() {
-  const { socket, connected } = useSocket()
+  const { socket, connected, reconnecting, onReconnect } = useSocket()
   const { tournament, teams, setTournament, setTeams } = useTournamentStore()
   const { matchId, team1Id, team2Id, score, setMatchId, setMatchTeams, setScore } = useMatchStore()
+
+  // Function to refresh all state from server
+  const refreshState = useCallback(() => {
+    if (!socket) return
+    socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
+      if (!ack.ok) return
+      setTournament(ack.data)
+    })
+  }, [socket, setTournament])
+
+  // Subscribe to reconnect events
+  useEffect(() => {
+    return onReconnect(() => {
+      refreshState()
+    })
+  }, [onReconnect, refreshState])
 
   useEffect(() => {
     if (!socket) return
@@ -70,8 +86,8 @@ export function FanView() {
         <div className="display-header">
           <h1>🏐 {tournament?.name ?? 'Turniej'}</h1>
           <div className="flex items-center gap-2">
-            <span className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
-              {connected ? 'Online' : 'Offline'}
+            <span className={`status-badge ${connected ? 'connected' : reconnecting ? 'reconnecting' : 'disconnected'}`}>
+              {connected ? 'Online' : reconnecting ? 'Łączenie...' : 'Offline'}
             </span>
             <Link to="/display/bracket" className="btn btn-secondary btn-sm">
               Drabinka
