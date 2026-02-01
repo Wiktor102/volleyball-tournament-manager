@@ -639,13 +639,13 @@ When multiple admins edit simultaneously:
   - [ ] Manual team assignment
   - [ ] Drag-and-drop support
   - [ ] Bye slot handling
-- [ ] Match Control page
-  - [ ] Large score display
-  - [ ] Increment/decrement buttons
+- [x] Match Control page
+  - [x] Large score display
+  - [x] Increment/decrement buttons
   - [ ] Set management
   - [ ] Timer controls (for timed mode)
   - [ ] Undo functionality
-  - [ ] End match / advance winner
+  - [x] End match / advance winner
 - [x] Teams Manager page
   - [x] Team list with edit/delete
   - [ ] Player management per team

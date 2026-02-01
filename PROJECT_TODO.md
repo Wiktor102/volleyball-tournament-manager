@@ -27,7 +27,7 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 ### Mecze „realne” (nie demo)
 - [x] Backend: MatchService – start/end/reset, wybór zwycięzcy, aktualizacja statusu `pending/live/completed`
 - [x] Socket.io: `admin:match:start`, `admin:match:end`, `admin:match:reset`
-- [ ] Frontend: Match Control (`/admin/match/:id`) – pełnoekranowa kontrola meczu
+- [x] Frontend: Match Control (`/admin/match/:id`) – pełnoekranowa kontrola meczu
 
 ## 2) Scoring (zgodnie z planem)
 - [ ] `scoring.service.ts` – tryby:
