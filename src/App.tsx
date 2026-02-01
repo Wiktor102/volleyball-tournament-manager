@@ -3,6 +3,7 @@ import { Dashboard } from './pages/admin/Dashboard'
 import { TeamsManager } from './pages/admin/TeamsManager'
 import { BracketEditor } from './pages/admin/BracketEditor'
 import { FanView } from './pages/display/FanView'
+import { BracketDisplay } from './pages/display/BracketDisplay'
 import { StreamOverlay } from './pages/overlay/StreamOverlay'
 import { NotFound } from './pages/NotFound'
 
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/admin/teams" element={<TeamsManager />} />
         <Route path="/admin/bracket" element={<BracketEditor />} />
         <Route path="/display/fan" element={<FanView />} />
+        <Route path="/display/bracket" element={<BracketDisplay />} />
         <Route path="/overlay" element={<StreamOverlay />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -22,7 +22,7 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
   - [ ] automatyczne utworzenie meczu o 3. miejsce (po zakończeniu półfinałów)
 - [x] Socket.io: `bracket:*` eventy (`bracket:updated`, `admin:bracket:assign`, `admin:bracket:swap`)
 - [x] Frontend: Bracket Editor (`/admin/bracket`) – manualne przypisania (na start: forma bez drag&drop)
-- [ ] Frontend: Bracket Display (`/display/bracket`) – widok tylko do odczytu
+- [x] Frontend: Bracket Display (`/display/bracket`) – widok tylko do odczytu
 
 ### Mecze „realne” (nie demo)
 - [x] Backend: MatchService – start/end/reset, wybór zwycięzcy, aktualizacja statusu `pending/live/completed`
