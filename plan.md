@@ -603,16 +603,16 @@ When multiple admins edit simultaneously:
 ### Phase 2: Core Backend
 - [ ] Implement database models and services
   - [ ] Tournament service (CRUD)
-  - [ ] Team service (CRUD)
+  - [x] Team service (CRUD)
   - [ ] Player service (CRUD)
-  - [ ] Bracket service (generation, updates)
-  - [ ] Match service (CRUD, score management)
+  - [x] Bracket service (generation, updates)
+  - [x] Match service (CRUD, score management)
   - [ ] Scoring service (pluggable scoring modes)
 - [ ] Implement Socket.io event handlers
   - [ ] Tournament events
   - [ ] Match events (score updates, status)
-  - [ ] Bracket events
-  - [ ] Team events
+  - [x] Bracket events
+  - [x] Team events
 - [ ] Add conflict resolution for concurrent edits
 
 ### Phase 3: Shared Infrastructure

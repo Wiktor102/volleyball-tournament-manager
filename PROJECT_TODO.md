@@ -10,23 +10,23 @@ Poniżej lista rzeczy, które nadal są **niezaimplementowane** lub są tylko w 
 
 ## 1) Braki krytyczne – żeby to było „turniejowe”, nie demo
 ### Turniej / drużyny / zawodnicy (CRUD)
-- [ ] Socket.io: dodać `team:*` eventy (create/update/delete/list)
-- [ ] Backend: TeamService – update/delete + walidacja Zod
+- [x] Socket.io: dodać `team:*` eventy (create/update/delete/list)
+- [x] Backend: TeamService – update/delete + walidacja Zod
 - [ ] Backend: PlayerService (CRUD) + eventy
-- [ ] Frontend: Teams Manager (`/admin/teams`) – lista + dodawanie/edycja/usuwanie
+- [x] Frontend: Teams Manager (`/admin/teams`) – lista + dodawanie/edycja/usuwanie
 
 ### Drabinka single-elimination + 3. miejsce
-- [ ] Backend: BracketService
-  - [ ] generowanie drabinki z N drużyn (byes do potęgi 2)
-  - [ ] modelowanie `nextMatchId` i propagacja zwycięzcy
+- [x] Backend: BracketService
+  - [x] generowanie drabinki z N drużyn (byes do potęgi 2)
+  - [x] modelowanie `nextMatchId` i propagacja zwycięzcy
   - [ ] automatyczne utworzenie meczu o 3. miejsce (po zakończeniu półfinałów)
-- [ ] Socket.io: `bracket:*` eventy (`bracket:updated`, `admin:bracket:assign`, `admin:bracket:swap`)
-- [ ] Frontend: Bracket Editor (`/admin/bracket`) – manualne przypisania (na start: forma bez drag&drop)
+- [x] Socket.io: `bracket:*` eventy (`bracket:updated`, `admin:bracket:assign`, `admin:bracket:swap`)
+- [x] Frontend: Bracket Editor (`/admin/bracket`) – manualne przypisania (na start: forma bez drag&drop)
 - [ ] Frontend: Bracket Display (`/display/bracket`) – widok tylko do odczytu
 
 ### Mecze „realne” (nie demo)
-- [ ] Backend: MatchService – start/end/reset, wybór zwycięzcy, aktualizacja statusu `pending/live/completed`
-- [ ] Socket.io: `admin:match:start`, `admin:match:end`, `admin:match:reset`
+- [x] Backend: MatchService – start/end/reset, wybór zwycięzcy, aktualizacja statusu `pending/live/completed`
+- [x] Socket.io: `admin:match:start`, `admin:match:end`, `admin:match:reset`
 - [ ] Frontend: Match Control (`/admin/match/:id`) – pełnoekranowa kontrola meczu
 
 ## 2) Scoring (zgodnie z planem)

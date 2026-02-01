@@ -19,7 +19,10 @@ export type BracketMatch = {
 }
 
 export async function listBracketMatches(tournamentId: string): Promise<BracketMatch[]> {
-  const rows = await db.select().from(bracketMatches).where(eq(bracketMatches.tournamentId, tournamentId))
+  const rows = await db
+    .select()
+    .from(bracketMatches)
+    .where(and(eq(bracketMatches.tournamentId, tournamentId), ne(bracketMatches.roundNumber, 0)))
   return rows.map((r) => ({
     id: r.id,
     tournamentId: r.tournamentId,

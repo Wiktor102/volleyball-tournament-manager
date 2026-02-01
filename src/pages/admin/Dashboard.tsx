@@ -68,6 +68,16 @@ export function Dashboard() {
     socket.emit('admin:score:decrement', { matchId, team })
   }
 
+  const stopMatch = () => {
+    if (!socket || !tournament || !matchId) return
+    socket.emit('admin:match:reset', { tournamentId: tournament.id, matchId }, (ack: Ack<unknown>) => {
+      if (!ack.ok) return
+      setMatchId(null)
+      setMatchTeams(null, null)
+      setScore(null)
+    })
+  }
+
   const team1Name = teams.find((t) => t.id === team1Id)?.name ?? 'Drużyna 1'
   const team2Name = teams.find((t) => t.id === team2Id)?.name ?? 'Drużyna 2'
 
@@ -89,6 +99,9 @@ export function Dashboard() {
             </div>
             <button onClick={ensureDemoMatch} disabled={creating}>
               {creating ? 'Tworzenie…' : 'Utwórz mecz demo'}
+            </button>{' '}
+            <button onClick={stopMatch} disabled={!matchId}>
+              Zatrzymaj mecz
             </button>
           </div>
         ) : (

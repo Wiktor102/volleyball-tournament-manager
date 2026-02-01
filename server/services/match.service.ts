@@ -228,9 +228,9 @@ export async function createDemoMatch(tournamentId: string) {
   await db.insert(bracketMatches).values({
     id: matchId,
     tournamentId,
-    roundNumber: 1,
-    matchNumber: 1,
-    positionInRound: 1,
+    roundNumber: 0,
+    matchNumber: 0,
+    positionInRound: 0,
     team1Id: a?.id ?? null,
     team2Id: b?.id ?? null,
     status: 'live',
