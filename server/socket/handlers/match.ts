@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io'
-import { MatchEndSchema, MatchResetSchema, MatchStartSchema, ScoreDecrementSchema, ScoreIncrementSchema } from '../../utils/validation'
+import { MatchEndSchema, MatchResetSchema, MatchStartSchema, ScoreDecrementSchema, ScoreIncrementSchema, SetAwardSchema, SetUndoSchema } from '../../utils/validation'
 import { getTournamentState } from '../../services/state.service'
-import { decrementPoint, endMatch, ensureMatchScore, getMatchScore, incrementPoint, resetMatch, startMatch } from '../../services/match.service'
+import { awardSet, decrementPoint, endMatch, ensureMatchScore, getMatchScore, incrementPoint, resetMatch, startMatch, undoSet } from '../../services/match.service'
 import { listBracketMatches } from '../../services/bracket.service'
 
 export function registerMatchHandlers(io: Server, socket: Socket) {
@@ -28,6 +28,24 @@ export function registerMatchHandlers(io: Server, socket: Socket) {
     if (!parsed.success) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
 
     const score = await decrementPoint(parsed.data.matchId, parsed.data.team)
+    io.to(`match:${parsed.data.matchId}`).emit('match:score', score)
+    return ack?.({ ok: true, data: score })
+  })
+
+  socket.on('admin:set:award', async (payload, ack) => {
+    const parsed = SetAwardSchema.safeParse(payload)
+    if (!parsed.success) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
+
+    const score = await awardSet(parsed.data.matchId, parsed.data.team)
+    io.to(`match:${parsed.data.matchId}`).emit('match:score', score)
+    return ack?.({ ok: true, data: score })
+  })
+
+  socket.on('admin:set:undo', async (payload, ack) => {
+    const parsed = SetUndoSchema.safeParse(payload)
+    if (!parsed.success) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
+
+    const score = await undoSet(parsed.data.matchId)
     io.to(`match:${parsed.data.matchId}`).emit('match:score', score)
     return ack?.({ ok: true, data: score })
   })

@@ -164,6 +164,18 @@ export function MatchControl() {
     })
   }
 
+  const awardSetToTeam = (team: 'team1' | 'team2') => {
+    if (!socket || !matchId) return
+    socket.emit('admin:set:award', { matchId, team })
+    addToast('Set przyznany', 'success')
+  }
+
+  const undoLastSet = () => {
+    if (!socket || !matchId) return
+    socket.emit('admin:set:undo', { matchId })
+    addToast('Cofnięto ostatni set', 'info')
+  }
+
   const t1 = teams.find((t) => t.id === match?.team1Id)
   const t2 = teams.find((t) => t.id === match?.team2Id)
 
@@ -248,6 +260,27 @@ export function MatchControl() {
 
             {/* Score Display */}
             <div className="card">
+              {/* Sets Display */}
+              {(score?.setsToWin ?? 3) > 1 && (
+                <div className="sets-display">
+                  <div className="sets-score">
+                    <span style={{ color: t1?.color || undefined }}>{score?.team1Sets ?? 0}</span>
+                    <span className="sets-separator">:</span>
+                    <span style={{ color: t2?.color || undefined }}>{score?.team2Sets ?? 0}</span>
+                  </div>
+                  <div className="sets-label">Sety (do {score?.setsToWin ?? 3})</div>
+                  {score?.setScores && score.setScores.length > 0 && (
+                    <div className="set-history">
+                      {score.setScores.map((s, i) => (
+                        <span key={i} className="set-result">
+                          Set {i + 1}: {s.t1}-{s.t2}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="score-display">
                 <div className="score-team left">
                   <div className="score-team-name" style={{ color: t1?.color || undefined }}>
@@ -283,6 +316,21 @@ export function MatchControl() {
                   <div className="keyboard-hint mt-2">L (+) / P (-)</div>
                 </div>
               </div>
+
+              {/* Set Controls */}
+              {canScore && (
+                <div className="set-controls">
+                  <button className="btn btn-secondary" onClick={() => awardSetToTeam('team1')}>
+                    Przyznaj set: {t1?.shortName || t1?.name || 'D1'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={undoLastSet} disabled={!score?.setScores?.length}>
+                    ↶ Cofnij ostatni set
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => awardSetToTeam('team2')}>
+                    Przyznaj set: {t2?.shortName || t2?.name || 'D2'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Match Controls */}

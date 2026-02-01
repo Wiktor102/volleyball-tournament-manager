@@ -40,6 +40,15 @@ export const ScoreIncrementSchema = z.object({
 
 export const ScoreDecrementSchema = ScoreIncrementSchema
 
+export const SetAwardSchema = z.object({
+  matchId: z.string().min(1),
+  team: z.enum(['team1', 'team2']),
+})
+
+export const SetUndoSchema = z.object({
+  matchId: z.string().min(1),
+})
+
 export const MatchStartSchema = z.object({
   tournamentId: z.string().min(1),
   matchId: z.string().min(1),

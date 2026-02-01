@@ -258,19 +258,76 @@ export async function resetMatch(tournamentId: string, matchId: string) {
 
 export async function incrementPoint(matchId: string, team: 'team1' | 'team2') {
   const score = await ensureMatchScore(matchId)
-  const next = {
-    team1CurrentPoints: score.team1CurrentPoints + (team === 'team1' ? 1 : 0),
-    team2CurrentPoints: score.team2CurrentPoints + (team === 'team2' ? 1 : 0),
+  
+  // Get scoring config
+  const config = score.scoringMode as { mode?: string; pointsToWin?: number; tieBreakPoints?: number } | null
+  const mode = config?.mode ?? 'sets' // Default to sets scoring
+  
+  if (mode === 'points') {
+    // Simple points-only mode - just increment
+    const next = {
+      team1CurrentPoints: score.team1CurrentPoints + (team === 'team1' ? 1 : 0),
+      team2CurrentPoints: score.team2CurrentPoints + (team === 'team2' ? 1 : 0),
+    }
+    await db
+      .update(matchScores)
+      .set({ ...next, updatedAt: Date.now() })
+      .where(eq(matchScores.matchId, matchId))
+    return await getMatchScore(matchId)
   }
+  
+  // Volleyball sets mode
+  const setsToWin = score.setsToWin || 3
+  const isTieBreak = score.currentSet === (setsToWin * 2 - 1) // 5th set in best-of-5
+  const pointsToWin = isTieBreak ? (config?.tieBreakPoints ?? 15) : (config?.pointsToWin ?? 25)
+  const minAdvantage = 2
+  
+  let t1Points = score.team1CurrentPoints + (team === 'team1' ? 1 : 0)
+  let t2Points = score.team2CurrentPoints + (team === 'team2' ? 1 : 0)
+  let t1Sets = score.team1Sets
+  let t2Sets = score.team2Sets
+  let currentSet = score.currentSet
+  const setScores = [...score.setScores]
+  
+  // Check if this point wins the set
+  const scoringTeamPoints = team === 'team1' ? t1Points : t2Points
+  const otherTeamPoints = team === 'team1' ? t2Points : t1Points
+  const isSetWon = scoringTeamPoints >= pointsToWin && (scoringTeamPoints - otherTeamPoints) >= minAdvantage
+  
+  if (isSetWon) {
+    // Record set score
+    setScores.push({ t1: t1Points, t2: t2Points })
+    
+    // Award set
+    if (team === 'team1') t1Sets++
+    else t2Sets++
+    
+    // Reset points for next set
+    t1Points = 0
+    t2Points = 0
+    currentSet++
+  }
+  
   await db
     .update(matchScores)
-    .set({ ...next, updatedAt: Date.now() })
+    .set({
+      team1CurrentPoints: t1Points,
+      team2CurrentPoints: t2Points,
+      team1Sets: t1Sets,
+      team2Sets: t2Sets,
+      currentSet,
+      setScoresJson: JSON.stringify(setScores),
+      updatedAt: Date.now(),
+    })
     .where(eq(matchScores.matchId, matchId))
+  
   return await getMatchScore(matchId)
 }
 
 export async function decrementPoint(matchId: string, team: 'team1' | 'team2') {
   const score = await ensureMatchScore(matchId)
+  
+  // Simple decrement - just reduce current points, don't undo sets
   const next = {
     team1CurrentPoints: Math.max(0, score.team1CurrentPoints - (team === 'team1' ? 1 : 0)),
     team2CurrentPoints: Math.max(0, score.team2CurrentPoints - (team === 'team2' ? 1 : 0)),
@@ -279,5 +336,57 @@ export async function decrementPoint(matchId: string, team: 'team1' | 'team2') {
     .update(matchScores)
     .set({ ...next, updatedAt: Date.now() })
     .where(eq(matchScores.matchId, matchId))
+  return await getMatchScore(matchId)
+}
+
+// Manually award a set (for corrections or simple scoring)
+export async function awardSet(matchId: string, team: 'team1' | 'team2') {
+  const score = await ensureMatchScore(matchId)
+  
+  const t1Points = score.team1CurrentPoints
+  const t2Points = score.team2CurrentPoints
+  const setScores = [...score.setScores, { t1: t1Points, t2: t2Points }]
+  
+  await db
+    .update(matchScores)
+    .set({
+      team1Sets: score.team1Sets + (team === 'team1' ? 1 : 0),
+      team2Sets: score.team2Sets + (team === 'team2' ? 1 : 0),
+      team1CurrentPoints: 0,
+      team2CurrentPoints: 0,
+      currentSet: score.currentSet + 1,
+      setScoresJson: JSON.stringify(setScores),
+      updatedAt: Date.now(),
+    })
+    .where(eq(matchScores.matchId, matchId))
+  
+  return await getMatchScore(matchId)
+}
+
+// Undo last set (for corrections)
+export async function undoSet(matchId: string) {
+  const score = await ensureMatchScore(matchId)
+  
+  if (score.setScores.length === 0) return score
+  
+  const setScores = [...score.setScores]
+  const lastSet = setScores.pop()!
+  
+  // Determine which team won the last set
+  const t1WonLast = lastSet.t1 > lastSet.t2
+  
+  await db
+    .update(matchScores)
+    .set({
+      team1Sets: Math.max(0, score.team1Sets - (t1WonLast ? 1 : 0)),
+      team2Sets: Math.max(0, score.team2Sets - (t1WonLast ? 0 : 1)),
+      team1CurrentPoints: lastSet.t1,
+      team2CurrentPoints: lastSet.t2,
+      currentSet: Math.max(1, score.currentSet - 1),
+      setScoresJson: JSON.stringify(setScores),
+      updatedAt: Date.now(),
+    })
+    .where(eq(matchScores.matchId, matchId))
+  
   return await getMatchScore(matchId)
 }
