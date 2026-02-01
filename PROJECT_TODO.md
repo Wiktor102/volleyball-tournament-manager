@@ -111,11 +111,12 @@
 #### 1. Backend Services
 - [x] Tournament service (create, update, delete, list with full CRUD)
 - [x] Player service (CRUD + team assignment)
-- [ ] Scoring service (pluggable modes, persist config per tournament)
-- [ ] Scoring modes:
+- [x] Scoring service (pluggable modes, persist config per tournament)
+- [x] Scoring modes:
   - [x] Points (simple increment)
   - [x] Sets (with auto-win, tie-break)
-  - [ ] Timed (match timer, overtime, golden set)
+  - [x] Timed (match timer with pause/resume, countdown)
+- [x] Per-round scoring overrides (e.g., final uses timed mode)
 
 #### 2. Admin Features
 - [x] Tournament setup wizard / creation flow
@@ -288,9 +289,10 @@ Completed:
 11. ✅ Player management in TeamsManager
 12. ✅ Confirmation modals for destructive actions
 13. ✅ Production build setup (npm run build && npm start)
+14. ✅ Timed scoring mode with timer UI (pause/resume, countdown, overtime display)
+15. ✅ Per-round scoring overrides (e.g., final uses timed mode while other rounds use sets)
 
 Next priorities:
-- Timed scoring mode
 - Player Info View (/display/player)
 - Fan View next match preview
 - Overlay info rotator
