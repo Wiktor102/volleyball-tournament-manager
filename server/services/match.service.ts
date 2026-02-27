@@ -3,7 +3,13 @@ import { db } from "../db";
 import { bracketMatches, matchScores } from "../db/schema";
 import { id } from "../utils/id";
 import { listBracketMatches } from "./bracket.service";
-import { getTournament, getScoringForRound, DEFAULT_SCORING_SETTINGS, type ScoringSettings } from "./tournament.service";
+import {
+	getTournament,
+	getScoringForRound,
+	DEFAULT_SCORING_SETTINGS,
+	updateTournament,
+	type ScoringSettings
+} from "./tournament.service";
 
 type MatchRow = InferSelectModel<typeof bracketMatches>;
 type ScoreRow = InferSelectModel<typeof matchScores>;
@@ -205,6 +211,17 @@ export async function startMatch(tournamentId: string, matchId: string) {
 
 	const updated = await getMatch(matchId);
 	if (!updated) return { ok: false as const, error: "Nie udało się uruchomić meczu" };
+
+	// Ensure tournament status is set to 'live' when the first match starts.
+	try {
+		const t = await getTournament(tournamentId);
+		if (t && t.status !== "live" && t.status !== "completed") {
+			await updateTournament(tournamentId, { status: "live" });
+		}
+	} catch (e) {
+		// Don't block starting the match if tournament status update fails.
+	}
+
 	return { ok: true as const, match: updated };
 }
 
@@ -378,7 +395,7 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 			t1: t1Points,
 			t2: t2Points,
 			startedAt: currentSetStartedAt,
-			endedAt: now,
+			endedAt: now
 		});
 
 		// Award set
@@ -430,12 +447,15 @@ export async function awardSet(matchId: string, team: "team1" | "team2") {
 
 	const t1Points = score.team1CurrentPoints;
 	const t2Points = score.team2CurrentPoints;
-	const setScores = [...score.setScores, {
-		t1: t1Points,
-		t2: t2Points,
-		startedAt: score.currentSetStartedAt,
-		endedAt: now,
-	}];
+	const setScores = [
+		...score.setScores,
+		{
+			t1: t1Points,
+			t2: t2Points,
+			startedAt: score.currentSetStartedAt,
+			endedAt: now
+		}
+	];
 
 	await db
 		.update(matchScores)
