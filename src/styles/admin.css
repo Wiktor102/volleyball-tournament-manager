@@ -43,6 +43,10 @@
   padding: 24px;
 }
 
+.admin-container--bracket {
+  max-width: none;
+}
+
 /* Header */
 .admin-header {
   display: flex;
@@ -897,6 +901,10 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 32px;
+}
+
+.display-container--bracket {
+  max-width: none;
 }
 
 .display-header {
