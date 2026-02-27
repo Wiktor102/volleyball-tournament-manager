@@ -83,17 +83,23 @@ export function Dashboard() {
 			if (state.score) setScore(state.score as MatchScore);
 		};
 		const onBracket = (items: BracketMatch[]) => setBracket(items);
+		const onStatusChanged = (data: { tournamentId: string; oldStatus: string; newStatus: string }) => {
+			const labels: Record<string, string> = { draft: "Szkic", live: "W trakcie", completed: "Zakończony" };
+			addToast(`Turniej zmienił status na: ${labels[data.newStatus] ?? data.newStatus}`, "info");
+		};
 
 		socket.on("tournament:updated", onTournamentUpdated);
 		socket.on("match:score", onMatchScore);
 		socket.on("tournament:state", onState);
 		socket.on("bracket:updated", onBracket);
+		socket.on("tournament:status:changed", onStatusChanged);
 
 		return () => {
 			socket.off("tournament:updated", onTournamentUpdated);
 			socket.off("match:score", onMatchScore);
 			socket.off("tournament:state", onState);
 			socket.off("bracket:updated", onBracket);
+			socket.off("tournament:status:changed", onStatusChanged);
 		};
 	}, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams]);
 

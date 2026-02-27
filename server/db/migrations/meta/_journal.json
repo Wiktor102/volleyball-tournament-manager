@@ -15,6 +15,13 @@
       "when": 1772181579697,
       "tag": "0001_drop_short_name",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772213673956,
+      "tag": "0002_blue_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

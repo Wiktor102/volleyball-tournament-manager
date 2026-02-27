@@ -33,6 +33,10 @@ export function registerTournamentHandlers(io: Server, socket: Socket) {
 		const t = await createTournament({ name: parsed.data.name, settings: parsed.data.settings });
 		io.to(`tournament:${t.id}`).emit("tournament:updated", t);
 		io.emit("tournament:list:updated"); // Notify all clients that list changed
+
+		const state = await getTournamentState(t.id);
+		if (state) io.to(`tournament:${t.id}`).emit("tournament:state", state);
+
 		return ack?.({ ok: true, data: t });
 	});
 
@@ -43,11 +47,43 @@ export function registerTournamentHandlers(io: Server, socket: Socket) {
 		};
 		if (!tournamentId || !patch) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
 
+		const old = await getTournament(tournamentId);
+		if (!old) return ack?.({ ok: false, error: "Nie znaleziono turnieju" });
+
 		const updated = await updateTournament(tournamentId, patch);
 		if (!updated) return ack?.({ ok: false, error: "Nie znaleziono turnieju" });
 
 		io.to(`tournament:${updated.id}`).emit("tournament:updated", updated);
 		io.emit("tournament:list:updated"); // Notify all clients that list changed
+
+		// Emit status change event if status changed
+		if (old.status !== updated.status) {
+			io.to(`tournament:${updated.id}`).emit("tournament:status:changed", {
+				tournamentId: updated.id,
+				oldStatus: old.status,
+				newStatus: updated.status,
+			});
+			io.to(`tournament:${updated.id}`).emit("tournament:admin:notification", {
+				tournamentId: updated.id,
+				type: "status:changed",
+				message: `Turniej zmienił status na: ${updated.status}`,
+				oldStatus: old.status,
+				newStatus: updated.status,
+			});
+		}
+
+		// Emit settings change event if settings changed
+		if (JSON.stringify(old.settings) !== JSON.stringify(updated.settings)) {
+			io.to(`tournament:${updated.id}`).emit("tournament:settings:changed", {
+				tournamentId: updated.id,
+				settings: updated.settings,
+			});
+		}
+
+		// Always re-broadcast full tournament state
+		const state = await getTournamentState(updated.id);
+		if (state) io.to(`tournament:${updated.id}`).emit("tournament:state", state);
+
 		return ack?.({ ok: true, data: updated });
 	});
 

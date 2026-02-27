@@ -7,6 +7,8 @@ export type Player = {
   id: string
   teamId: string
   name: string
+  jerseyNumber: number | null
+  position: string | null
   createdAt: number
 }
 
@@ -17,6 +19,8 @@ function rowToPlayer(row: PlayerRow): Player {
     id: row.id,
     teamId: row.teamId,
     name: row.name,
+    jerseyNumber: row.jerseyNumber ?? null,
+    position: row.position ?? null,
     createdAt: row.createdAt,
   }
 }
@@ -31,13 +35,20 @@ export async function listPlayersByTeam(teamId: string): Promise<Player[]> {
   return rows.map(rowToPlayer)
 }
 
-export async function createPlayer(input: { teamId: string; name: string }): Promise<Player> {
+export async function createPlayer(input: {
+  teamId: string
+  name: string
+  jerseyNumber?: number | null
+  position?: string | null
+}): Promise<Player> {
   const now = Date.now()
   const playerId = id('p')
   await db.insert(players).values({
     id: playerId,
     teamId: input.teamId,
     name: input.name,
+    jerseyNumber: input.jerseyNumber ?? null,
+    position: input.position ?? null,
     createdAt: now,
   })
   const p = await getPlayer(playerId)
@@ -45,12 +56,20 @@ export async function createPlayer(input: { teamId: string; name: string }): Pro
   return p
 }
 
-export async function updatePlayer(playerId: string, patch: { name?: string }): Promise<Player | null> {
+export async function updatePlayer(
+  playerId: string,
+  patch: { name?: string; jerseyNumber?: number | null; position?: string | null },
+): Promise<Player | null> {
   const existing = await getPlayer(playerId)
   if (!existing) return null
 
-  if (patch.name !== undefined) {
-    await db.update(players).set({ name: patch.name }).where(eq(players.id, playerId))
+  const updates: Partial<{ name: string; jerseyNumber: number | null; position: string | null }> = {}
+  if (patch.name !== undefined) updates.name = patch.name
+  if (patch.jerseyNumber !== undefined) updates.jerseyNumber = patch.jerseyNumber
+  if (patch.position !== undefined) updates.position = patch.position
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(players).set(updates).where(eq(players.id, playerId))
   }
 
   return await getPlayer(playerId)

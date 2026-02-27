@@ -3,15 +3,19 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSocket } from "../socket/context";
 import { useToast } from "./Toast";
 import { getAdminPreferences, setAdminPreferences } from "./ConfirmModal";
+import { useTournamentStore } from "../stores/tournament.store";
 import "../styles/admin.css";
 
 export function AdminLayout() {
 	const { connected, reconnecting } = useSocket();
 	const { addToast } = useToast();
 	const location = useLocation();
+	const { tournament } = useTournamentStore();
 	const [externalOpenPath, setExternalOpenPath] = useState<string | null>(null);
 	const [settingsOpenPath, setSettingsOpenPath] = useState<string | null>(null);
 	const [skipConfirmations, setSkipConfirmations] = useState(() => getAdminPreferences().skipConfirmations);
+
+	const statsEnabled = tournament?.settings?.playerStatsEnabled === true;
 
 	const externalRef = useRef<HTMLDivElement>(null);
 	const settingsRef = useRef<HTMLDivElement>(null);
@@ -76,6 +80,16 @@ export function AdminLayout() {
 						>
 							Turnieje
 						</NavLink>
+						{statsEnabled && (
+							<NavLink
+								to="/admin/stats"
+								className={({ isActive }) =>
+									`admin-topbar__link ${isActive ? "admin-topbar__link--active" : ""}`
+								}
+							>
+								Statystyki
+							</NavLink>
+						)}
 					</nav>
 				</div>
 

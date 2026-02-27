@@ -50,6 +50,8 @@ export const UpdatePlayerSchema = z.object({
   playerId: z.string().min(1),
   patch: z.object({
     name: z.string().min(1).optional(),
+    jerseyNumber: z.number().int().min(0).max(99).nullable().optional(),
+    position: z.enum(['setter', 'libero', 'outside', 'middle', 'opposite', 'universal']).nullable().optional(),
   }).strict(),
 })
 
@@ -106,4 +108,43 @@ export const SetScoreEditSchema = z.object({
   setIndex: z.number().min(0),
   t1: z.number().min(0),
   t2: z.number().min(0),
+})
+
+// Event schemas
+export const LogEventSchema = z.object({
+  matchId: z.string(),
+  tournamentId: z.string(),
+  eventType: z.enum(['ace', 'ball-out', 'challenge', 'net-touch', 'block', 'timeout']),
+  team: z.enum(['team1', 'team2']),
+  playerId: z.string().optional(),
+  setNumber: z.number().int().min(1),
+  scoreSnapshot: z.object({
+    team1Points: z.number().int(),
+    team2Points: z.number().int(),
+    team1Sets: z.number().int(),
+    team2Sets: z.number().int(),
+  }).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const DeleteEventSchema = z.object({
+  eventId: z.string(),
+})
+
+export const ClearMatchEventsSchema = z.object({
+  matchId: z.string(),
+})
+
+export const GetMatchEventsSchema = z.object({
+  matchId: z.string(),
+})
+
+export const GetTeamStatsSchema = z.object({
+  tournamentId: z.string(),
+  teamId: z.string(),
+})
+
+export const GetPlayerStatsSchema = z.object({
+  tournamentId: z.string(),
+  playerId: z.string().optional(),
 })

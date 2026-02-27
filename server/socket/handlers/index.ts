@@ -4,6 +4,7 @@ import { registerMatchHandlers } from './match'
 import { registerTeamHandlers } from './team'
 import { registerBracketHandlers } from './bracket'
 import { registerPlayerHandlers } from './player'
+import { registerEventHandlers } from './event'
 
 export function registerHandlers(io: Server, socket: Socket) {
   registerTournamentHandlers(io, socket)
@@ -11,4 +12,5 @@ export function registerHandlers(io: Server, socket: Socket) {
   registerTeamHandlers(io, socket)
   registerBracketHandlers(io, socket)
   registerPlayerHandlers(io, socket)
+  registerEventHandlers(io, socket)
 }

@@ -24,6 +24,8 @@ export const players = sqliteTable('players', {
   id: text('id').primaryKey(),
   teamId: text('team_id').notNull(),
   name: text('name').notNull(),
+  jerseyNumber: integer('jersey_number'),
+  position: text('position'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -59,4 +61,17 @@ export const matchScores = sqliteTable('match_scores', {
   startedAt: integer('started_at'),
   endedAt: integer('ended_at'),
   updatedAt: integer('updated_at').notNull(),
+})
+
+export const matchEvents = sqliteTable('match_events', {
+  id: text('id').primaryKey(),
+  matchId: text('match_id').notNull(),
+  tournamentId: text('tournament_id').notNull(),
+  eventType: text('event_type').notNull(), // 'ace' | 'ball-out' | 'challenge' | 'net-touch' | 'block' | 'timeout'
+  team: text('team').notNull(), // 'team1' | 'team2'
+  playerId: text('player_id'),  // nullable
+  setNumber: integer('set_number').notNull(),
+  scoreSnapshot: text('score_snapshot'), // JSON: {team1Points, team2Points, team1Sets, team2Sets}
+  metadata: text('metadata'),  // JSON: additional data (e.g. challenge result)
+  createdAt: integer('created_at').notNull(),
 })

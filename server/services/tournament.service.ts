@@ -24,6 +24,8 @@ export type RoundScoringOverride = {
 export type TournamentSettings = {
   scoring: ScoringSettings
   roundOverrides?: RoundScoringOverride[]
+  matchEventsEnabled?: boolean  // default true
+  playerStatsEnabled?: boolean  // default false
 }
 
 export const DEFAULT_SCORING_SETTINGS: ScoringSettings = {
@@ -57,6 +59,8 @@ function rowToTournament(row: TournamentRow): Tournament {
       ...(rawSettings.scoring ?? {}),
     },
     roundOverrides: rawSettings.roundOverrides ?? [],
+    matchEventsEnabled: rawSettings.matchEventsEnabled ?? true,
+    playerStatsEnabled: rawSettings.playerStatsEnabled ?? false,
   }
   return {
     id: row.id,
@@ -118,6 +122,8 @@ export async function createTournament(input: { name: string; settings?: Partial
       ...(input.settings?.scoring ?? {}),
     },
     roundOverrides: input.settings?.roundOverrides,
+    matchEventsEnabled: input.settings?.matchEventsEnabled ?? true,
+    playerStatsEnabled: input.settings?.playerStatsEnabled ?? false,
   }
   await db.insert(tournaments).values({
     id: tournamentId,
@@ -147,6 +153,8 @@ export async function updateTournament(
       ...(patch.settings?.scoring ?? {}),
     },
     roundOverrides: patch.settings?.roundOverrides ?? existing.settings.roundOverrides,
+    matchEventsEnabled: patch.settings?.matchEventsEnabled ?? existing.settings.matchEventsEnabled ?? true,
+    playerStatsEnabled: patch.settings?.playerStatsEnabled ?? existing.settings.playerStatsEnabled ?? false,
   }
 
   await db

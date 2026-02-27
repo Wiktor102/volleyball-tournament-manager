@@ -11,7 +11,10 @@ import {
 import type { MatchScore } from "../../stores/match.store";
 import { useToast } from "../../components/Toast";
 import { useConfirm } from "../../components/ConfirmModal";
+import { EventPanel } from "../../components/match/EventPanel";
 import "../../styles/admin.css";
+
+type Player = { id: string; teamId: string; name: string };
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
 
@@ -42,6 +45,7 @@ export function MatchControl() {
 	const [match, setMatch] = useState<BracketMatch | null>(null);
 	const [score, setScore] = useState<MatchScore | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [players, setPlayers] = useState<Player[]>([]);
 
 	// Manual score editing state
 	const [editingScore, setEditingScore] = useState(false);
@@ -188,6 +192,19 @@ export function MatchControl() {
 		loadMatch();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tournament?.id, matchId]);
+
+	// Load players for both teams once the match teams are known
+	useEffect(() => {
+		if (!socket || !match?.team1Id || !match?.team2Id) return;
+		type PlayerAck = { ok: true; data: Player[] | null } | { ok: false; error: string };
+		socket.emit(
+			"player:list",
+			{ teamIds: [match.team1Id, match.team2Id] },
+			(ack: PlayerAck) => {
+				if (ack.ok && ack.data) setPlayers(ack.data);
+			}
+		);
+	}, [socket, match?.team1Id, match?.team2Id]);
 
 	useEffect(() => {
 		if (!socket || !matchId) return;
@@ -654,9 +671,30 @@ export function MatchControl() {
 				)}
 			</div>
 
-			{/* ── Row 4: Footer (set controls + match lifecycle) ── */}
-			{match && (
-				<div className="mc-card mc-footer">
+			{/* ── Event Panel (collapsible, between score and footer) ── */}
+		{match && tournament && (
+			<EventPanel
+				matchId={matchId}
+				tournamentId={tournament.id}
+				team1={t1 ? { id: t1.id, name: t1.name, color: t1.color } : undefined}
+				team2={t2 ? { id: t2.id, name: t2.name, color: t2.color } : undefined}
+				currentSet={score?.currentSet ?? 1}
+				scoreSnapshot={{
+					team1Points: score?.team1CurrentPoints ?? 0,
+					team2Points: score?.team2CurrentPoints ?? 0,
+					team1Sets: score?.team1Sets ?? 0,
+					team2Sets: score?.team2Sets ?? 0,
+				}}
+				matchEventsEnabled={true}
+				playerStatsEnabled={false}
+				canScore={!!canScore}
+				players={players}
+			/>
+		)}
+
+		{/* ── Row 4: Footer (set controls + match lifecycle) ── */}
+		{match && (
+			<div className="mc-card mc-footer">
 					{/* Manual score save/cancel bar */}
 					{editingScore && (
 						<div className="mc-score__manual-actions">

@@ -15,7 +15,20 @@ type Player = {
 	id: string;
 	teamId: string;
 	name: string;
+	jerseyNumber?: number | null;
+	position?: string | null;
 };
+
+const POSITION_LABELS: Record<string, string> = {
+	setter: "Rozgrywający",
+	libero: "Libero",
+	outside: "Atakujący z lewej",
+	middle: "Środkowy",
+	opposite: "Atakujący z prawej",
+	universal: "Uniwersalny",
+};
+
+const POSITIONS = ["setter", "libero", "outside", "middle", "opposite", "universal"] as const;
 
 const randomColor = () => {
 	const c = Math.floor(Math.random() * 0xffffff).toString(16);
@@ -197,6 +210,19 @@ export function TeamsManager() {
 		if (!socket) return;
 		socket.emit("admin:player:delete", { playerId, teamId });
 		addToast("Zawodnik usunięty", "info");
+	};
+
+	const updatePlayerField = (
+		playerId: string,
+		_teamId: string,
+		patch: { jerseyNumber?: number | null; position?: string | null }
+	) => {
+		if (!socket) return;
+		socket.emit("admin:player:update", { playerId, patch }, (ack: Ack<Player>) => {
+			if (!ack.ok) {
+				addToast(ack.error, "error");
+			}
+		});
 	};
 
 	// CSV import
@@ -470,7 +496,55 @@ export function TeamsManager() {
 														<ul className="player-list">
 															{(players[t.id] ?? []).map(p => (
 																<li key={p.id} className="player-item">
-																	<span>{p.name}</span>
+																	<span style={{ flex: 1 }}>{p.name}</span>
+																	{tournament?.settings?.playerStatsEnabled && (
+																		<>
+																			<input
+																				type="number"
+																				className="form-input form-input-sm"
+																				style={{ width: 56, textAlign: "center" }}
+																				placeholder="#"
+																				min={0}
+																				max={99}
+																				value={p.jerseyNumber ?? ""}
+																				title="Numer na koszulce"
+																				onChange={e => {
+																					const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+																					setPlayers(prev => ({
+																						...prev,
+																						[t.id]: (prev[t.id] ?? []).map(x =>
+																							x.id === p.id ? { ...x, jerseyNumber: val } : x
+																						)
+																					}));
+																				}}
+																				onBlur={e => {
+																					const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+																					updatePlayerField(p.id, t.id, { jerseyNumber: val });
+																				}}
+																			/>
+																			<select
+																				className="form-input form-input-sm"
+																				style={{ width: 160 }}
+																				value={p.position ?? ""}
+																				title="Pozycja"
+																				onChange={e => {
+																					const val = e.target.value === "" ? null : e.target.value;
+																					setPlayers(prev => ({
+																						...prev,
+																						[t.id]: (prev[t.id] ?? []).map(x =>
+																							x.id === p.id ? { ...x, position: val } : x
+																						)
+																					}));
+																					updatePlayerField(p.id, t.id, { position: val });
+																				}}
+																			>
+																				<option value="">— pozycja —</option>
+																				{POSITIONS.map(pos => (
+																					<option key={pos} value={pos}>{POSITION_LABELS[pos]}</option>
+																				))}
+																			</select>
+																		</>
+																	)}
 																	<button
 																		className="btn btn-danger btn-xs"
 																		onClick={() => removePlayer(p.id, t.id)}
