@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useMatchStore, type MatchScore } from "../../stores/match.store";
 import { useTournamentStore, type Tournament, type TournamentState } from "../../stores/tournament.store";
 import { useToast } from "../../components/Toast";
-import { getAdminPreferences, setAdminPreferences } from "../../components/ConfirmModal";
 import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
@@ -24,7 +23,7 @@ type BracketMatch = {
 };
 
 export function Dashboard() {
-	const { socket, connected, reconnecting, onReconnect } = useSocket();
+	const { socket, onReconnect } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const { setMatchId, setMatchTeams, setScore } = useMatchStore();
 	const { addToast } = useToast();
@@ -32,7 +31,8 @@ export function Dashboard() {
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 	const [saving, setSaving] = useState(false);
 	const [loaded, setLoaded] = useState(false);
-	const [skipConfirmations, setSkipConfirmations] = useState(() => getAdminPreferences().skipConfirmations);
+	const [kebabOpen, setKebabOpen] = useState(false);
+	const kebabRef = useRef<HTMLDivElement>(null);
 
 	// Function to refresh all state from server
 	const refreshState = useCallback(() => {
@@ -129,77 +129,65 @@ export function Dashboard() {
 	const team1 = liveMatch ? teams.find(t => t.id === liveMatch.team1Id) : null;
 	const team2 = liveMatch ? teams.find(t => t.id === liveMatch.team2Id) : null;
 
+	// Close kebab on outside click
+	useEffect(() => {
+		const handler = (e: MouseEvent) => {
+			if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+				setKebabOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, []);
+
 	// Show a brief loading / empty-state while the socket responds
 	if (!tournament) {
 		return (
-			<div className="admin-page">
-				<div className="admin-container">
-					<header className="admin-header">
-						<div className="flex items-center gap-2">
-							<h1>🏐 Panel administratora</h1>
+			<>
+				<div className="page-header">
+					<h1>Dashboard</h1>
+				</div>
+				<div className="card">
+					<div className="empty-state">
+						<div className="empty-state-icon">🏆</div>
+						<div className="empty-state-text">
+							{loaded ? "Brak turnieju. Utwórz aby rozpocząć." : "Ładowanie..."}
 						</div>
-					</header>
-					<div className="card">
-						<div className="empty-state">
-							<div className="empty-state-icon">🏆</div>
-							<div className="empty-state-text">
-								{loaded ? "Brak turnieju. Utwórz aby rozpocząć." : "Ładowanie..."}
-							</div>
-							{loaded && (
-								<Link to="/admin/tournament/new" className="btn btn-primary" style={{ marginTop: 16 }}>
-									+ Utwórz turniej
-								</Link>
-							)}
-						</div>
+						{loaded && (
+							<Link to="/admin/tournament/new" className="btn btn-primary" style={{ marginTop: 16 }}>
+								+ Utwórz turniej
+							</Link>
+						)}
 					</div>
 				</div>
-			</div>
+			</>
 		);
 	}
 
 	return (
-		<div className="admin-page">
-			<div className="admin-container">
-				<header className="admin-header">
-					<div className="flex items-center gap-2">
-						<h1>🏐 Panel administratora</h1>
-						<span
-							className={`status-badge ${connected ? "connected" : reconnecting ? "reconnecting" : "disconnected"}`}
-						>
-							{connected ? "Połączono" : reconnecting ? "Łączenie..." : "Rozłączono"}
-						</span>
-					</div>
-					<nav className="admin-nav">
-						<Link to="/admin/tournaments">Turnieje</Link>
-						<Link to="/admin/teams">Drużyny</Link>
-						<Link to="/admin/bracket">Drabinka</Link>
-						<Link to="/display/fan">Widok fanów</Link>
-						<Link to="/display/bracket">Podgląd drabinki</Link>
-						<Link to="/overlay">Overlay</Link>
-					</nav>
-				</header>
-
-				{/* Workflow Steps */}
-				<div className="workflow">
-					<div className={`workflow-step ${currentStep > 1 ? "completed" : currentStep === 1 ? "active" : ""}`}>
-						<span className="workflow-step-number">{currentStep > 1 ? "✓" : "1"}</span>
-						<span>Dodaj drużyny</span>
-					</div>
-					<span className="workflow-arrow">→</span>
-					<div className={`workflow-step ${currentStep > 2 ? "completed" : currentStep === 2 ? "active" : ""}`}>
-						<span className="workflow-step-number">{currentStep > 2 ? "✓" : "2"}</span>
-						<span>Wygeneruj drabinkę</span>
-					</div>
-					<span className="workflow-arrow">→</span>
-					<div className={`workflow-step ${currentStep > 3 ? "completed" : currentStep === 3 ? "active" : ""}`}>
-						<span className="workflow-step-number">{currentStep > 3 ? "✓" : "3"}</span>
-						<span>Rozgrywaj mecze</span>
-					</div>
+		<>
+			{/* Workflow Steps */}
+			<div className="workflow">
+				<div className={`workflow-step ${currentStep > 1 ? "completed" : currentStep === 1 ? "active" : ""}`}>
+					<span className="workflow-step-number">{currentStep > 1 ? "✓" : "1"}</span>
+					<span>Dodaj drużyny</span>
 				</div>
+				<span className="workflow-arrow">→</span>
+				<div className={`workflow-step ${currentStep > 2 ? "completed" : currentStep === 2 ? "active" : ""}`}>
+					<span className="workflow-step-number">{currentStep > 2 ? "✓" : "2"}</span>
+					<span>Wygeneruj drabinkę</span>
+				</div>
+				<span className="workflow-arrow">→</span>
+				<div className={`workflow-step ${currentStep > 3 ? "completed" : currentStep === 3 ? "active" : ""}`}>
+					<span className="workflow-step-number">{currentStep > 3 ? "✓" : "3"}</span>
+					<span>Rozgrywaj mecze</span>
+				</div>
+			</div>
 
-				{/* Tournament Settings */}
-				<div className="card">
-					<div className="card-header">
+			{/* Tournament Settings */}
+			<div className="card">
+				<div className="card-header">
+					<div className="flex items-center gap-1">
 						<h2>Turniej</h2>
 						{tournament && (
 							<span className={`status-badge ${tournament.status}`}>
@@ -210,166 +198,157 @@ export function Dashboard() {
 										: "Zakończony"}
 							</span>
 						)}
+						{tournament?.settings?.scoring && (
+							<span className="status-badge draft">
+								{tournament.settings.scoring.mode === "sets"
+									? `Sety (do ${tournament.settings.scoring.setsToWin})`
+									: tournament.settings.scoring.mode === "timed"
+										? "Na czas"
+										: "Punkty"}
+							</span>
+						)}
 					</div>
-					{tournament ? (
-						<>
-							<div className="form-row">
-								<div className="form-group" style={{ flex: 2 }}>
-									<label className="form-label">Nazwa turnieju</label>
-									<input
-										className="form-input"
-										value={tournamentName}
-										onChange={e => setTournamentName(e.target.value)}
-										placeholder="Nazwa turnieju"
-									/>
-								</div>
-								<div className="form-group" style={{ flex: 0 }}>
-									<label className="form-label">&nbsp;</label>
-									<button
-										className="btn btn-primary"
-										onClick={saveTournamentName}
-										disabled={saving || tournamentName === tournament.name}
-									>
-										{saving ? "Zapisywanie..." : "Zapisz"}
-									</button>
-								</div>
+					{/* Kebab menu for tournament management */}
+					<div className="admin-dropdown" ref={kebabRef}>
+						<button
+							type="button"
+							className="kebab-btn"
+							onClick={() => setKebabOpen(!kebabOpen)}
+							aria-label="Więcej opcji"
+							title="Więcej opcji"
+						>
+							⋮
+						</button>
+						{kebabOpen && (
+							<div className="admin-dropdown__menu admin-dropdown__menu--right">
+								<Link
+									to={`/admin/tournament/${tournament.id}`}
+									className="admin-dropdown__item"
+									onClick={() => setKebabOpen(false)}
+								>
+									<span>⚙️</span> Ustawienia punktacji
+								</Link>
+								<Link
+									to="/admin/tournaments"
+									className="admin-dropdown__item"
+									onClick={() => setKebabOpen(false)}
+								>
+									<span>⇄</span> Zmień turniej
+								</Link>
+								<div className="admin-dropdown__divider" />
+								<Link
+									to="/admin/tournament/new"
+									className="admin-dropdown__item"
+									onClick={() => setKebabOpen(false)}
+								>
+									<span>➕</span> Nowy turniej
+								</Link>
 							</div>
-							<div className="flex gap-2" style={{ marginTop: 12 }}>
-								<Link to={`/admin/tournament/${tournament.id}`} className="btn btn-secondary btn-sm">
-									⚙️ Ustawienia punktacji
-								</Link>
-								<Link to="/admin/tournaments" className="btn btn-secondary btn-sm">
-									⇄ Zmień turniej
-								</Link>
-								<Link to="/admin/tournament/new" className="btn btn-secondary btn-sm">
-									+ Nowy turniej
-								</Link>
-							</div>
-							{tournament.settings?.scoring && (
-								<div className="info-message" style={{ marginTop: 12 }}>
-									<strong>Tryb:</strong>{" "}
-									{tournament.settings.scoring.mode === "sets"
-										? `Do ${tournament.settings.scoring.setsToWin} setów (po ${tournament.settings.scoring.pointsToWinSet} pkt)`
-										: "Tylko punkty"}
-								</div>
-							)}
-						</>
-					) : (
-						<div className="text-muted">Ładowanie...</div>
-					)}
-				</div>
-
-				{/* Quick Stats */}
-				<div className="grid grid-3">
-					<div className="card">
-						<div className="card-header">
-							<h3>Drużyny</h3>
-						</div>
-						<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>{teams.length}</div>
-						<Link to="/admin/teams" className="btn btn-secondary btn-sm">
-							{teams.length === 0 ? "Dodaj drużyny" : "Zarządzaj drużynami"}
-						</Link>
-					</div>
-
-					<div className="card">
-						<div className="card-header">
-							<h3>Drabinka</h3>
-						</div>
-						<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>
-							{bracket.length > 0
-								? `${bracket.filter(m => m.status === "completed").length}/${bracket.length}`
-								: "—"}
-						</div>
-						<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
-							{bracket.length === 0 ? "Wygeneruj drabinkę" : "Edytuj drabinkę"}
-						</Link>
-					</div>
-
-					<div className="card">
-						<div className="card-header">
-							<h3>Aktualny mecz</h3>
-						</div>
-						{liveMatch ? (
-							<>
-								<div className="live-indicator mb-2">
-									<span className="live-dot"></span>
-									<span>NA ŻYWO</span>
-								</div>
-								<div style={{ fontSize: 14, marginBottom: 12 }}>
-									<span style={{ color: team1?.color || undefined }}>{team1?.name || "—"}</span>
-									<span className="text-dim"> vs </span>
-									<span style={{ color: team2?.color || undefined }}>{team2?.name || "—"}</span>
-								</div>
-								<Link to={`/admin/match/${liveMatch.id}`} className="btn btn-primary btn-sm">
-									Kontroluj mecz
-								</Link>
-							</>
-						) : (
-							<>
-								<div className="text-muted mb-2">Brak aktywnego meczu</div>
-								{pendingMatches.length > 0 && (
-									<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
-										Rozpocznij mecz
-									</Link>
-								)}
-							</>
 						)}
 					</div>
 				</div>
-
-				{/* Next Steps Guidance */}
-				{currentStep === 1 && (
-					<div className="info-message">
-						<strong>Następny krok:</strong> Dodaj co najmniej 2 drużyny, aby móc wygenerować drabinkę turniejową.
-						<Link to="/admin/teams" style={{ marginLeft: 12 }}>
-							Przejdź do drużyn →
-						</Link>
+				{tournament ? (
+					<div className="form-row">
+						<div className="form-group mb-0" style={{ flex: 2 }}>
+							<label className="form-label">Nazwa turnieju</label>
+							<input
+								className="form-input"
+								value={tournamentName}
+								onChange={e => setTournamentName(e.target.value)}
+								placeholder="Nazwa turnieju"
+							/>
+						</div>
+						<div className="form-group mb-0" style={{ flex: 0 }}>
+							<label className="form-label">&nbsp;</label>
+							<button
+								className="btn btn-primary"
+								onClick={saveTournamentName}
+								disabled={saving || tournamentName === tournament.name}
+							>
+								{saving ? "Zapisywanie..." : "Zapisz"}
+							</button>
+						</div>
 					</div>
+				) : (
+					<div className="text-muted">Ładowanie...</div>
 				)}
+			</div>
 
-				{currentStep === 2 && (
-					<div className="info-message">
-						<strong>Następny krok:</strong> Masz {teams.length} drużyn. Wygeneruj drabinkę turniejową, aby
-						rozpocząć mecze.
-						<Link to="/admin/bracket" style={{ marginLeft: 12 }}>
-							Przejdź do drabinki →
-						</Link>
-					</div>
-				)}
-
-				{currentStep === 3 && pendingMatches.length > 0 && !liveMatch && (
-					<div className="info-message">
-						<strong>Gotowe do gry:</strong> Masz {pendingMatches.length} oczekujących meczów. Rozpocznij pierwszy
-						mecz z drabinki.
-						<Link to="/admin/bracket" style={{ marginLeft: 12 }}>
-							Przejdź do drabinki →
-						</Link>
-					</div>
-				)}
-
-				{/* Admin Preferences */}
-				<div className="card" style={{ marginTop: 8 }}>
+			{/* Quick Stats */}
+			<div className="grid grid-3">
+				<div className="card">
 					<div className="card-header">
-						<h3>Preferencje admina</h3>
+						<h3>Drużyny</h3>
 					</div>
-					<label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14 }}>
-						<input
-							type="checkbox"
-							checked={skipConfirmations}
-							onChange={e => {
-								const val = e.target.checked;
-								setSkipConfirmations(val);
-								setAdminPreferences({ skipConfirmations: val });
-								addToast(
-									val ? "Potwierdzenia wyłączone (oprócz krytycznych)" : "Potwierdzenia włączone",
-									"info"
-								);
-							}}
-						/>
-						Pomiń okna potwierdzenia (oprócz krytycznych, np. usuwanie)
-					</label>
+					<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>{teams.length}</div>
+					{currentStep === 1 && (
+						<div className="text-muted mb-1" style={{ fontSize: 13 }}>
+							Dodaj co najmniej 2 drużyny, aby wygenerować drabinkę.
+						</div>
+					)}
+					<Link to="/admin/teams" className="btn btn-secondary btn-sm">
+						{teams.length === 0 ? "Dodaj drużyny" : "Zarządzaj drużynami"}
+					</Link>
+				</div>
+
+				<div className="card">
+					<div className="card-header">
+						<h3>Drabinka</h3>
+					</div>
+					<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>
+						{bracket.length > 0
+							? `${bracket.filter(m => m.status === "completed").length}/${bracket.length}`
+							: "—"}
+					</div>
+					{currentStep === 2 && (
+						<div className="text-muted mb-1" style={{ fontSize: 13 }}>
+							Masz {teams.length} drużyn — wygeneruj drabinkę.
+						</div>
+					)}
+					<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
+						{bracket.length === 0 ? "Wygeneruj drabinkę" : "Edytuj drabinkę"}
+					</Link>
+				</div>
+
+				<div className="card">
+					<div className="card-header">
+						<h3>Aktualny mecz</h3>
+					</div>
+					{liveMatch ? (
+						<>
+							<div className="live-indicator mb-2">
+								<span className="live-dot"></span>
+								<span>NA ŻYWO</span>
+							</div>
+							<div style={{ fontSize: 14, marginBottom: 12 }}>
+								<span style={{ color: team1?.color || undefined }}>{team1?.name || "—"}</span>
+								<span className="text-dim"> vs </span>
+								<span style={{ color: team2?.color || undefined }}>{team2?.name || "—"}</span>
+							</div>
+							<Link to={`/admin/match/${liveMatch.id}`} className="btn btn-primary btn-sm">
+								Kontroluj mecz
+							</Link>
+						</>
+					) : (
+						<>
+							<div className="text-muted mb-2">Brak aktywnego meczu</div>
+							{pendingMatches.length > 0 && (
+								<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
+									Rozpocznij mecz
+								</Link>
+							)}
+						</>
+					)}
 				</div>
 			</div>
-		</div>
+
+			{/* Guidance for ready-to-play state */}
+			{currentStep === 3 && pendingMatches.length > 0 && !liveMatch && (
+				<div className="info-message">
+					<strong>Gotowe do gry:</strong> Masz {pendingMatches.length} oczekujących meczów.{" "}
+					<Link to="/admin/bracket">Przejdź do drabinki →</Link>
+				</div>
+			)}
+		</>
 	);
 }

@@ -25,14 +25,13 @@ type BracketMatch = {
 type MatchAck = { id: string };
 
 export function BracketEditor() {
-	const { socket, connected } = useSocket();
+	const { socket } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const { addToast } = useToast();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
-
 	useEffect(() => {
 		if (!socket) return;
 
@@ -274,311 +273,284 @@ export function BracketEditor() {
 	const totalRounds = Math.max(...rounds.map(r => r.round), 0);
 
 	return (
-		<div className="admin-page">
-			<div className="admin-container admin-container--bracket">
-				<header className="admin-header">
-					<div className="flex items-center gap-2">
-						<h1>Drabinka turniejowa</h1>
-						<span className={`status-badge ${connected ? "connected" : "disconnected"}`}>
-							{connected ? "Połączono" : "Rozłączono"}
-						</span>
+		<>
+			{/* Actions */}
+			<div className="card">
+				<div className="card-header card-header--tight">
+					<h2>Drabinka turniejowa</h2>
+					<div className="page-header__actions">
+						<button
+							className="btn btn-primary btn-sm"
+							onClick={() => gen("auto")}
+							disabled={!tournament || teams.length < 2}
+						>
+							Generuj auto
+						</button>
+						<button
+							className="btn btn-secondary btn-sm"
+							onClick={() => gen("manual")}
+							disabled={!tournament || teams.length < 2}
+						>
+							Generuj ręcznie
+						</button>
+						{bracket.length > 0 && (
+							<button className="btn btn-danger btn-sm" onClick={clear}>
+								Wyczyść
+							</button>
+						)}
 					</div>
-					<nav className="admin-nav">
-						<Link to="/admin">← Panel główny</Link>
-						<Link to="/admin/teams">Drużyny</Link>
-						<Link to="/display/bracket">Podgląd publiczny</Link>
-					</nav>
-				</header>
-
-				{/* Actions */}
-				<div className="card">
-					<div className="card-header">
-						<h2>Akcje</h2>
-						<div className="btn-group">
-							<button
-								className="btn btn-primary"
-								onClick={() => gen("auto")}
-								disabled={!tournament || teams.length < 2}
-							>
-								Generuj automatycznie
-							</button>
-							<button
-								className="btn btn-secondary"
-								onClick={() => gen("manual")}
-								disabled={!tournament || teams.length < 2}
-							>
-								Generuj ręcznie
-							</button>
-							<button
-								className="btn btn-danger"
-								onClick={clear}
-								disabled={!tournament || bracket.length === 0}
-							>
-								Wyczyść drabinkę
-							</button>
-							<button className="btn btn-secondary" onClick={load} disabled={!tournament}>
-								Odśwież
-							</button>
-						</div>
-					</div>
-					{error && <div className="error-message">{error}</div>}
-					{teams.length < 2 && (
-						<div className="info-message">
-							Potrzebujesz co najmniej 2 drużyn, aby wygenerować drabinkę.{" "}
-							<Link to="/admin/teams">Dodaj drużyny →</Link>
-						</div>
-					)}
 				</div>
-
-				{/* Manual assignment info */}
-				{bracket.length > 0 && unassignedSlotCount > 0 && (
-					<div className="card">
-						<div className="info-message">
-							Przypisz drużyny do {unassignedSlotCount} wolnych miejsc w 1. rundzie. Każda drużyna może
-							wystąpić tylko raz. Pozostałe rundy wypełnią się automatycznie na podstawie zwycięzców.
-						</div>
+				{error && <div className="error-message">{error}</div>}
+				{teams.length < 2 && (
+					<div className="info-message">
+						Potrzebujesz co najmniej 2 drużyn, aby wygenerować drabinkę.{" "}
+						<Link to="/admin/teams">Dodaj drużyny →</Link>
 					</div>
 				)}
+			</div>
 
-				{/* Bracket */}
-				{rounds.length === 0 ? (
-					<div className="card">
-						<div className="empty-state">
-							<div className="empty-state-icon">🏆</div>
-							<div className="empty-state-text">
-								Brak drabinki. Dodaj drużyny i wygeneruj drabinkę, aby rozpocząć turniej.
-							</div>
+			{/* Manual assignment info */}
+			{bracket.length > 0 && unassignedSlotCount > 0 && (
+				<div className="card">
+					<div className="info-message">
+						Przypisz drużyny do {unassignedSlotCount} wolnych miejsc w 1. rundzie. Każda drużyna może wystąpić
+						tylko raz. Pozostałe rundy wypełnią się automatycznie na podstawie zwycięzców.
+					</div>
+				</div>
+			)}
+
+			{/* Bracket */}
+			{rounds.length === 0 ? (
+				<div className="card">
+					<div className="empty-state">
+						<div className="empty-state-icon">🏆</div>
+						<div className="empty-state-text">
+							Brak drabinki. Dodaj drużyny i wygeneruj drabinkę, aby rozpocząć turniej.
 						</div>
 					</div>
-				) : (
-					<div className="bracket-rounds">
-						{rounds.map(({ round, matches }) => (
-							<div key={round} className="bracket-round">
-								<h3>{getRoundName(round, totalRounds)}</h3>
-								<div className="list">
-									{matches.map(m => {
-										const t1 = teams.find(t => t.id === m.team1Id);
-										const t2 = teams.find(t => t.id === m.team2Id);
-										return (
-											<div key={m.id} className={`match-card ${m.status}`}>
-												<div className="match-card-header">
-													<span className="match-number">Mecz #{m.matchNumber}</span>
-													<span className={`status-badge ${m.status}`}>
-														{m.status === "pending"
-															? "Oczekuje"
-															: m.status === "live"
-																? "Na żywo"
-																: "Zakończony"}
-													</span>
-												</div>
-
-												<div className="match-teams">
-													{round === 1 ? (
-														<select
-															className="form-select"
-															disabled={m.status !== "pending"}
-															value={m.team1Id ?? ""}
-															onChange={e =>
-																assign(m.id, "team1", e.target.value ? e.target.value : null)
-															}
-														>
-															<option value="">— Wybierz drużynę —</option>
-															{getAvailableTeams(m.team1Id).map(t => (
-																<option key={t.id} value={t.id}>
-																	{teamLabel(t)}
-																</option>
-															))}
-														</select>
-													) : (
-														<div
-															className={`match-team ${m.winnerId === m.team1Id ? "winner" : ""}`}
-															style={{ color: t1?.color || undefined }}
-														>
-															{teamLabel(t1)}
-														</div>
-													)}
-
-													{round === 1 ? (
-														<select
-															className="form-select"
-															disabled={m.status !== "pending"}
-															value={m.team2Id ?? ""}
-															onChange={e =>
-																assign(m.id, "team2", e.target.value ? e.target.value : null)
-															}
-														>
-															<option value="">— Wybierz drużynę —</option>
-															{getAvailableTeams(m.team2Id).map(t => (
-																<option key={t.id} value={t.id}>
-																	{teamLabel(t)}
-																</option>
-															))}
-														</select>
-													) : (
-														<div
-															className={`match-team ${m.winnerId === m.team2Id ? "winner" : ""}`}
-															style={{ color: t2?.color || undefined }}
-														>
-															{teamLabel(t2)}
-														</div>
-													)}
-												</div>
-
-												{m.winnerId && (
-													<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
-														✓ Zwycięzca: {teamLabel(teams.find(t => t.id === m.winnerId))}
-													</div>
-												)}
-
-												<div className="btn-group">
-													<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
-														Kontrola meczu
-													</Link>
-													{m.status === "pending" && m.team1Id && m.team2Id && (
-														<button
-															className="btn btn-success btn-sm"
-															onClick={() => start(m.id)}
-														>
-															Rozpocznij
-														</button>
-													)}
-													{m.status === "live" && (
-														<>
-															<button
-																className="btn btn-primary btn-sm"
-																disabled={!m.team1Id}
-																onClick={() => end(m.id, m.team1Id!)}
-															>
-																Wygrywa {t1?.name || "D1"}
-															</button>
-															<button
-																className="btn btn-primary btn-sm"
-																disabled={!m.team2Id}
-																onClick={() => end(m.id, m.team2Id!)}
-															>
-																Wygrywa {t2?.name || "D2"}
-															</button>
-															<button
-																className="btn btn-danger btn-sm"
-																onClick={() => reset(m.id, getMatchDescription(m))}
-															>
-																Reset
-															</button>
-														</>
-													)}
-													{m.status === "completed" && (
-														<button
-															className="btn btn-secondary btn-sm"
-															onClick={() => reset(m.id, getMatchDescription(m))}
-														>
-															Resetuj mecz
-														</button>
-													)}
-												</div>
+				</div>
+			) : (
+				<div className="bracket-rounds">
+					{rounds.map(({ round, matches }) => (
+						<div key={round} className="bracket-round">
+							<h3>{getRoundName(round, totalRounds)}</h3>
+							<div className="list">
+								{matches.map(m => {
+									const t1 = teams.find(t => t.id === m.team1Id);
+									const t2 = teams.find(t => t.id === m.team2Id);
+									return (
+										<div key={m.id} className={`match-card ${m.status}`}>
+											<div className="match-card-header">
+												<span className="match-number">Mecz #{m.matchNumber}</span>
+												<span className={`status-badge ${m.status}`}>
+													{m.status === "pending"
+														? "Oczekuje"
+														: m.status === "live"
+															? "Na żywo"
+															: "Zakończony"}
+												</span>
 											</div>
-										);
-									})}
-								</div>
-							</div>
-						))}
 
-						{/* 3rd Place Match */}
-						{thirdPlaceMatch && (
-							<div className="bracket-round">
-								<h3>🥉 Mecz o 3. miejsce</h3>
-								<div className="list">
-									{(() => {
-										const m = thirdPlaceMatch;
-										const t1 = teams.find(t => t.id === m.team1Id);
-										const t2 = teams.find(t => t.id === m.team2Id);
-										return (
-											<div key={m.id} className={`match-card ${m.status}`}>
-												<div className="match-card-header">
-													<span className="match-number">O 3. miejsce</span>
-													<span className={`status-badge ${m.status}`}>
-														{m.status === "pending"
-															? "Oczekuje"
-															: m.status === "live"
-																? "Na żywo"
-																: "Zakończony"}
-													</span>
-												</div>
-
-												<div className="match-teams">
+											<div className="match-teams">
+												{round === 1 ? (
+													<select
+														className="form-select"
+														disabled={m.status !== "pending"}
+														value={m.team1Id ?? ""}
+														onChange={e =>
+															assign(m.id, "team1", e.target.value ? e.target.value : null)
+														}
+													>
+														<option value="">— Wybierz drużynę —</option>
+														{getAvailableTeams(m.team1Id).map(t => (
+															<option key={t.id} value={t.id}>
+																{teamLabel(t)}
+															</option>
+														))}
+													</select>
+												) : (
 													<div
 														className={`match-team ${m.winnerId === m.team1Id ? "winner" : ""}`}
 														style={{ color: t1?.color || undefined }}
 													>
 														{teamLabel(t1)}
 													</div>
+												)}
+
+												{round === 1 ? (
+													<select
+														className="form-select"
+														disabled={m.status !== "pending"}
+														value={m.team2Id ?? ""}
+														onChange={e =>
+															assign(m.id, "team2", e.target.value ? e.target.value : null)
+														}
+													>
+														<option value="">— Wybierz drużynę —</option>
+														{getAvailableTeams(m.team2Id).map(t => (
+															<option key={t.id} value={t.id}>
+																{teamLabel(t)}
+															</option>
+														))}
+													</select>
+												) : (
 													<div
 														className={`match-team ${m.winnerId === m.team2Id ? "winner" : ""}`}
 														style={{ color: t2?.color || undefined }}
 													>
 														{teamLabel(t2)}
 													</div>
-												</div>
-
-												{m.winnerId && (
-													<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
-														🥉 3. miejsce: {teamLabel(teams.find(t => t.id === m.winnerId))}
-													</div>
 												)}
+											</div>
 
-												<div className="btn-group">
-													<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
-														Kontrola meczu
-													</Link>
-													{m.status === "pending" && m.team1Id && m.team2Id && (
+											{m.winnerId && (
+												<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
+													✓ Zwycięzca: {teamLabel(teams.find(t => t.id === m.winnerId))}
+												</div>
+											)}
+
+											<div className="btn-group">
+												<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
+													Kontrola meczu
+												</Link>
+												{m.status === "pending" && m.team1Id && m.team2Id && (
+													<button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
+														Rozpocznij
+													</button>
+												)}
+												{m.status === "live" && (
+													<>
 														<button
-															className="btn btn-success btn-sm"
-															onClick={() => start(m.id)}
+															className="btn btn-primary btn-sm"
+															disabled={!m.team1Id}
+															onClick={() => end(m.id, m.team1Id!)}
 														>
-															Rozpocznij
+															Wygrywa {t1?.name || "D1"}
 														</button>
-													)}
-													{m.status === "live" && (
-														<>
-															<button
-																className="btn btn-primary btn-sm"
-																disabled={!m.team1Id}
-																onClick={() => end(m.id, m.team1Id!)}
-															>
-																Wygrywa {t1?.name || "D1"}
-															</button>
-															<button
-																className="btn btn-primary btn-sm"
-																disabled={!m.team2Id}
-																onClick={() => end(m.id, m.team2Id!)}
-															>
-																Wygrywa {t2?.name || "D2"}
-															</button>
-															<button
-																className="btn btn-danger btn-sm"
-																onClick={() => reset(m.id, getMatchDescription(m))}
-															>
-																Reset
-															</button>
-														</>
-													)}
-													{m.status === "completed" && (
 														<button
-															className="btn btn-secondary btn-sm"
+															className="btn btn-primary btn-sm"
+															disabled={!m.team2Id}
+															onClick={() => end(m.id, m.team2Id!)}
+														>
+															Wygrywa {t2?.name || "D2"}
+														</button>
+														<button
+															className="btn btn-danger btn-sm"
 															onClick={() => reset(m.id, getMatchDescription(m))}
 														>
-															Resetuj mecz
+															Reset
 														</button>
-													)}
+													</>
+												)}
+												{m.status === "completed" && (
+													<button
+														className="btn btn-secondary btn-sm"
+														onClick={() => reset(m.id, getMatchDescription(m))}
+													>
+														Resetuj mecz
+													</button>
+												)}
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					))}
+
+					{/* 3rd Place Match */}
+					{thirdPlaceMatch && (
+						<div className="bracket-round">
+							<h3>🥉 Mecz o 3. miejsce</h3>
+							<div className="list">
+								{(() => {
+									const m = thirdPlaceMatch;
+									const t1 = teams.find(t => t.id === m.team1Id);
+									const t2 = teams.find(t => t.id === m.team2Id);
+									return (
+										<div key={m.id} className={`match-card ${m.status}`}>
+											<div className="match-card-header">
+												<span className="match-number">O 3. miejsce</span>
+												<span className={`status-badge ${m.status}`}>
+													{m.status === "pending"
+														? "Oczekuje"
+														: m.status === "live"
+															? "Na żywo"
+															: "Zakończony"}
+												</span>
+											</div>
+
+											<div className="match-teams">
+												<div
+													className={`match-team ${m.winnerId === m.team1Id ? "winner" : ""}`}
+													style={{ color: t1?.color || undefined }}
+												>
+													{teamLabel(t1)}
+												</div>
+												<div
+													className={`match-team ${m.winnerId === m.team2Id ? "winner" : ""}`}
+													style={{ color: t2?.color || undefined }}
+												>
+													{teamLabel(t2)}
 												</div>
 											</div>
-										);
-									})()}
-								</div>
+
+											{m.winnerId && (
+												<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
+													🥉 3. miejsce: {teamLabel(teams.find(t => t.id === m.winnerId))}
+												</div>
+											)}
+
+											<div className="btn-group">
+												<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
+													Kontrola meczu
+												</Link>
+												{m.status === "pending" && m.team1Id && m.team2Id && (
+													<button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
+														Rozpocznij
+													</button>
+												)}
+												{m.status === "live" && (
+													<>
+														<button
+															className="btn btn-primary btn-sm"
+															disabled={!m.team1Id}
+															onClick={() => end(m.id, m.team1Id!)}
+														>
+															Wygrywa {t1?.name || "D1"}
+														</button>
+														<button
+															className="btn btn-primary btn-sm"
+															disabled={!m.team2Id}
+															onClick={() => end(m.id, m.team2Id!)}
+														>
+															Wygrywa {t2?.name || "D2"}
+														</button>
+														<button
+															className="btn btn-danger btn-sm"
+															onClick={() => reset(m.id, getMatchDescription(m))}
+														>
+															Reset
+														</button>
+													</>
+												)}
+												{m.status === "completed" && (
+													<button
+														className="btn btn-secondary btn-sm"
+														onClick={() => reset(m.id, getMatchDescription(m))}
+													>
+														Resetuj mecz
+													</button>
+												)}
+											</div>
+										</div>
+									);
+								})()}
 							</div>
-						)}
-					</div>
-				)}
-			</div>
-		</div>
+						</div>
+					)}
+				</div>
+			)}
+		</>
 	);
 }

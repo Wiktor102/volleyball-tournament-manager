@@ -97,6 +97,7 @@
   - [x] Tournament deletion (with typed confirmation)
   - [x] Bracket clearing
   - [x] Match reset
+- [x] Kebab menu icon & dropdown overflow fix (admin pages)
 
 ### Phase 8: Production & Deployment
 - [x] Production start script (npm start)
@@ -248,6 +249,7 @@ Completed:
 4. ✅ Confirmation for forcing/manually setting match winner
 5. ✅ Confirmation when generating bracket that overwrites existing
 6. ✅ Admin preference to opt-out of confirmations (localStorage, skips non-critical only)
+7. ✅ Kebab menu icon rendering corrected & dropdown overflow bug eliminated
 8. ✅ Manual bracket setup (auto/manual generation modes, duplicate prevention in team assignment)
 
 Skipped:

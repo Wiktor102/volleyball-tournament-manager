@@ -396,6 +396,8 @@ When multiple admins edit simultaneously:
 
 ### Page Designs
 
+> **Note:** Admin interface components such as “more”/kebab menus use a small SVG icon rather than a text ellipsis to avoid invisible glyphs on some systems, and dropdowns are kept inside non‑scrollable containers (or replaced with inline button groups) to prevent clipping when viewing the bracket navigator.
+
 #### 1. Admin Dashboard (`/admin`)
 ```
 ┌──────────────────────────────────────────────────────────────┐

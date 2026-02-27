@@ -9,7 +9,7 @@ import "../../styles/admin.css";
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export function TournamentList() {
-	const { socket, connected, reconnecting } = useSocket();
+	const { socket } = useSocket();
 	const { tournament: activeTournament, setTournament } = useTournamentStore();
 	const { addToast } = useToast();
 	const confirm = useConfirm();
@@ -103,101 +103,85 @@ export function TournamentList() {
 	};
 
 	return (
-		<div className="admin-page">
-			<div className="admin-container">
-				<header className="admin-header">
-					<div className="flex items-center gap-2">
-						<Link to="/admin" className="btn btn-secondary btn-sm">
-							← Powrót
-						</Link>
-						<h1>Turnieje</h1>
-						<span
-							className={`status-badge ${connected ? "connected" : reconnecting ? "reconnecting" : "disconnected"}`}
-						>
-							{connected ? "Połączono" : reconnecting ? "Łączenie..." : "Rozłączono"}
-						</span>
-					</div>
-					<Link to="/admin/tournament/new" className="btn btn-primary">
-						+ Nowy turniej
-					</Link>
-				</header>
+		<>
+			<div className="page-header">
+				<h1>Turnieje</h1>
+				<Link to="/admin/tournament/new" className="btn btn-primary btn-sm">
+					+ Nowy turniej
+				</Link>
+			</div>
 
-				<div className="card">
-					<div className="card-header">
-						<h2>Wszystkie turnieje</h2>
-						<span className="text-muted text-sm">
-							Kliknij &quot;Przełącz&quot;, aby zarządzać innym turniejem
-						</span>
-					</div>
+			<div className="card">
+				<div className="card-header">
+					<h2>Wszystkie turnieje</h2>
+					<span className="text-muted text-sm">Kliknij &quot;Przełącz&quot;, aby zarządzać innym turniejem</span>
+				</div>
 
-					{loading ? (
-						<div className="text-muted">Ładowanie...</div>
-					) : tournaments.length === 0 ? (
-						<div style={{ textAlign: "center", padding: "40px 0" }}>
-							<div className="text-muted" style={{ marginBottom: 16 }}>
-								Brak turniejów. Utwórz pierwszy turniej, aby zacząć.
-							</div>
-							<Link to="/admin/tournament/new" className="btn btn-primary">
-								+ Utwórz turniej
-							</Link>
+				{loading ? (
+					<div className="text-muted">Ładowanie...</div>
+				) : tournaments.length === 0 ? (
+					<div style={{ textAlign: "center", padding: "40px 0" }}>
+						<div className="text-muted" style={{ marginBottom: 16 }}>
+							Brak turniejów. Utwórz pierwszy turniej, aby zacząć.
 						</div>
-					) : (
-						<div className="tournament-list">
-							{tournaments.map(t => {
-								const isActive = t.id === activeTournament?.id;
-								const isSwitching = switching === t.id;
-								const isDeleting = deleting === t.id;
-								return (
-									<div
-										key={t.id}
-										className={`tournament-list-item${isActive ? " tournament-list-item--active" : ""}`}
-									>
-										<div className="tournament-list-item__info">
-											<div className="tournament-list-item__name">
-												{t.name}
-												{isActive && (
-													<span className="tournament-list-item__active-tag">aktywny</span>
-												)}
-											</div>
-											<div className="tournament-list-item__meta">
-												<span className={`status-badge ${t.status}`}>{statusLabel(t.status)}</span>
-												{t.settings?.scoring && (
-													<span className="text-muted text-sm">
-														{t.settings.scoring.mode === "sets"
-															? `Do ${t.settings.scoring.setsToWin} setów`
-															: t.settings.scoring.mode === "timed"
-																? `Na czas (${t.settings.scoring.matchDurationMinutes ?? 10} min)`
-																: "Tylko punkty"}
-													</span>
-												)}
-											</div>
+						<Link to="/admin/tournament/new" className="btn btn-primary">
+							+ Utwórz turniej
+						</Link>
+					</div>
+				) : (
+					<div className="tournament-list">
+						{tournaments.map(t => {
+							const isActive = t.id === activeTournament?.id;
+							const isSwitching = switching === t.id;
+							const isDeleting = deleting === t.id;
+							return (
+								<div
+									key={t.id}
+									className={`tournament-list-item${isActive ? " tournament-list-item--active" : ""}`}
+								>
+									<div className="tournament-list-item__info">
+										<div className="tournament-list-item__name">
+											{t.name}
+											{isActive && <span className="tournament-list-item__active-tag">aktywny</span>}
 										</div>
-										<div className="tournament-list-item__actions">
-											<button
-												className={`btn btn-sm ${isActive ? "btn-secondary" : "btn-primary"}`}
-												onClick={() => handleSwitch(t)}
-												disabled={isSwitching || isDeleting}
-											>
-												{isSwitching ? "Przełączanie..." : isActive ? "Zarządzaj" : "Przełącz"}
-											</button>
-											<Link to={`/admin/tournament/${t.id}`} className="btn btn-secondary btn-sm">
-												Ustawienia
-											</Link>
-											<button
-												className="btn btn-danger btn-sm"
-												onClick={() => handleDelete(t)}
-												disabled={isSwitching || isDeleting}
-											>
-												{isDeleting ? "Usuwanie..." : "Usuń"}
-											</button>
+										<div className="tournament-list-item__meta">
+											<span className={`status-badge ${t.status}`}>{statusLabel(t.status)}</span>
+											{t.settings?.scoring && (
+												<span className="text-muted text-sm">
+													{t.settings.scoring.mode === "sets"
+														? `Do ${t.settings.scoring.setsToWin} setów`
+														: t.settings.scoring.mode === "timed"
+															? `Na czas (${t.settings.scoring.matchDurationMinutes ?? 10} min)`
+															: "Tylko punkty"}
+												</span>
+											)}
 										</div>
 									</div>
-								);
-							})}
-						</div>
-					)}
-				</div>
+									<div className="tournament-list-item__actions">
+										<button
+											className={`btn btn-sm ${isActive ? "btn-secondary" : "btn-primary"}`}
+											onClick={() => handleSwitch(t)}
+											disabled={isSwitching || isDeleting}
+										>
+											{isSwitching ? "Przełączanie..." : isActive ? "Zarządzaj" : "Przełącz"}
+										</button>
+										<Link to={`/admin/tournament/${t.id}`} className="btn btn-secondary btn-sm">
+											Ustawienia
+										</Link>
+										<button
+											className="btn btn-danger btn-sm"
+											onClick={() => handleDelete(t)}
+											disabled={isSwitching || isDeleting}
+										>
+											{isDeleting ? "Usuwanie..." : "Usuń"}
+										</button>
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				)}
 			</div>
-		</div>
+		</>
 	);
 }
