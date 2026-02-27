@@ -92,7 +92,8 @@ volleyball-tournament/
 │   │   │   ├── tournament.ts    # Tournament events
 │   │   │   ├── match.ts         # Match events
 │   │   │   ├── team.ts          # Team events
-│   │   │   └── bracket.ts       # Bracket events
+│   │   │   ├── bracket.ts       # Bracket events
+│   │   │   └── event.ts         # Match event logging (ace, etc.)
 │   │   └── middleware.ts        # Socket middleware
 │   │
 │   ├── services/
@@ -100,7 +101,8 @@ volleyball-tournament/
 │   │   ├── match.service.ts
 │   │   ├── team.service.ts
 │   │   ├── bracket.service.ts
-│   │   └── scoring.service.ts   # Scoring logic (extensible)
+│   │   ├── scoring.service.ts   # Scoring logic (extensible)
+│   │   └── event.service.ts     # Match event CRUD & stats aggregation
 │   │
 │   └── utils/
 │       ├── bracket-utils.ts     # Bracket generation helpers
@@ -141,7 +143,8 @@ volleyball-tournament/
 │   │   │   ├── ScoreDisplay.tsx
 │   │   │   ├── ScoreEditor.tsx      # Admin score editing
 │   │   │   ├── SetScoreDisplay.tsx
-│   │   │   └── MatchTimer.tsx
+│   │   │   ├── MatchTimer.tsx
+│   │   │   └── EventPanel.tsx       # Match event buttons (ace, etc.)
 │   │   │
 │   │   ├── team/
 │   │   │   ├── TeamCard.tsx
@@ -154,6 +157,7 @@ volleyball-tournament/
 │   │       ├── ScoreBar.tsx         # Main score display
 │   │       ├── InfoRotator.tsx      # Rotating info panels
 │   │       ├── BracketPreview.tsx   # Animated bracket
+│   │       ├── EventBanner.tsx      # Event-triggered animation banner
 │   │       └── animations/          # Framer Motion variants
 │   │
 │   ├── pages/
@@ -163,13 +167,15 @@ volleyball-tournament/
 │   │   │   ├── BracketEditor.tsx    # Manual bracket editing
 │   │   │   ├── MatchControl.tsx     # Live match control
 │   │   │   ├── TeamsManager.tsx     # Manage teams/players
+│   │   │   ├── PlayerStats.tsx      # Player stats management (optional)
 │   │   │   └── Settings.tsx         # Tournament settings
 │   │   │
 │   │   ├── display/
 │   │   │   ├── FanView.tsx          # Big screen for audience
 │   │   │   ├── PlayerInfo.tsx       # Player-focused display
 │   │   │   ├── BracketDisplay.tsx   # Full bracket screen
-│   │   │   └── UpcomingMatches.tsx  # Schedule display
+│   │   │   ├── UpcomingMatches.tsx  # Schedule display
+│   │   │   └── StatsView.tsx        # Public match/team/player stats
 │   │   │
 │   │   └── overlay/
 │   │       ├── StreamOverlay.tsx    # OBS browser source
@@ -224,11 +230,10 @@ volleyball-tournament/
 │ id (PK)         │◄──────┤ id (PK)         │
 │ tournament_id   │  1:N  │ team_id (FK)    │
 │ name            │       │ name            │
-│ short_name      │       │ created_at      │
-│ color           │       └─────────────────┘
-│ seed            │
-│ eliminated      │
-│ created_at      │
+│ color           │       │ jersey_number   │
+│ seed            │       │ position        │
+│ eliminated      │       │ created_at      │
+│ created_at      │       └─────────────────┘
 └────────┬────────┘
          │
          │ N:M (via BracketMatch)
@@ -271,7 +276,28 @@ volleyball-tournament/
 │ ended_at                                     │
 │ updated_at                                   │
 └─────────────────────────────────────────────┘
+
+                       │
+                       │ 1:N
+                       ▼
+┌─────────────────────────────────────────────┐
+│               MatchEvent                     │
+├─────────────────────────────────────────────┤
+│ id (PK)                                      │
+│ match_id (FK)                                │
+│ event_type (ace|ball_out|challenge|           │
+│             net_touch|block|timeout|custom)   │
+│ team (team1|team2)                           │
+│ player_id (FK, nullable)                     │
+│ set_number                                   │
+│ team1_score_at (snapshot)                    │
+│ team2_score_at (snapshot)                    │
+│ metadata (JSON, nullable)                    │
+│ created_at                                   │
+└─────────────────────────────────────────────┘
 ```
+
+> **Player columns** `jersey_number` (integer, nullable) and `position` (text, nullable) are optional and only meaningful when the tournament has player stats tracking enabled (`settings.playerStatsEnabled`). The `MatchEvent.player_id` is also optional — events can be logged team-level without attributing to a specific player.
 
 ### Scoring Modes Configuration
 ```typescript
@@ -326,6 +352,11 @@ volleyball-tournament/
 // Team updates
 'team:updated'             // Team info changed
 'team:eliminated'          // Team knocked out
+
+// Match events (for overlay animations & stats)
+'match:event'              // New match event logged (ace, challenge, etc.)
+'match:event:deleted'      // Match event removed (undo)
+'match:events:cleared'     // All events for match cleared
 ```
 
 #### Client → Server Events (Actions)
@@ -343,6 +374,16 @@ volleyball-tournament/
 'admin:timer:start'        // Start match timer
 'admin:timer:pause'        // Pause timer
 'admin:timer:reset'        // Reset timer
+
+// Match event actions
+'admin:event:log'          // Log a match event (ace, ball-out, etc.)
+'admin:event:delete'       // Remove a logged event (undo)
+'admin:event:clear'        // Clear all events for a match
+
+// Stats queries (read-only, anyone can request)
+'stats:match:get'          // Get events/stats for a match
+'stats:team:get'           // Get aggregated stats for a team
+'stats:player:get'         // Get aggregated stats for a player
 ```
 
 ### Room-based Broadcasting
@@ -450,12 +491,30 @@ When multiple admins edit simultaneously:
 │                                                              │
 │    [⏱️ Timer: 00:00]   [▶️ Start]   [⏸️ Pauza]              │
 │                                                              │
+│  ┌─ ZDARZENIA ──────────────────────────────────────────┐   │
+│  │                                                       │   │
+│  │   Drużyna A:                    Drużyna B:            │   │
+│  │   [🏐 As]  [🚫 Aut]            [🏐 As]  [🚫 Aut]    │   │
+│  │   [🖐 Blok] [📛 Siatka]        [🖐 Blok] [📛 Siatka] │   │
+│  │   [📢 Challange]               [📢 Challange]        │   │
+│  │                                                       │   │
+│  │   Ostatnie: As serwisowy (A) 0:42  [↩ Cofnij]        │   │
+│  └───────────────────────────────────────────────────────┘   │
+│                                                              │
 │    ┌──────────────────────────────────────────────────────┐ │
 │    │  [🔄 Resetuj set]  [⏪ Cofnij]  [🏆 Zakończ mecz]     │ │
 │    └──────────────────────────────────────────────────────┘ │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+> **Event panel UX notes:**
+> - The event panel is **collapsible** (toggle button in the info bar) so it does not clutter the UI when not needed. Default state: collapsed on mobile, expanded on desktop/tablet.
+> - Each event type is a small **icon button with a short label** beneath it (e.g., "As", "Aut"). The buttons are arranged in two mirrored columns — one per team — so the admin taps the event on the correct team side.
+> - Tapping an event button immediately logs it (no extra confirmation). A **toast + "Ostatnie" row** shows the last logged event with an inline undo button, allowing quick correction.
+> - When player stats tracking is enabled for the tournament, tapping an event button opens a **quick player picker** (list of jersey numbers for that team) before logging. If disabled, events are logged at team level only.
+> - On narrow screens (portrait phones), event buttons wrap into a **scrollable chip row** to avoid vertical overflow.
+> - The event panel visibility is controlled by a **tournament setting** (`settings.matchEventsEnabled`). When disabled, the panel is hidden entirely and no event-related socket traffic is generated.
 
 #### 3. Fan Display (`/display/fan`) - Full Screen
 ```
@@ -560,6 +619,39 @@ When multiple admins edit simultaneously:
 // "ZWYCIĘZCA!" label animates in
 ```
 
+#### Match Event Animations (Overlay)
+When a match event is logged by the admin, the overlay displays a short animated banner that slides in and fades out after ~3 seconds. Events queue so they don't overlap.
+
+```typescript
+// Event banner — slides in from the side of the team that triggered it
+{
+  initial: { x: teamSide === 'team1' ? -300 : 300, opacity: 0 },
+  animate: { x: 0, opacity: 1 },
+  exit:    { opacity: 0, scale: 0.8 },
+  transition: { type: 'spring', stiffness: 200, damping: 20 }
+}
+
+// Banner content varies by event type:
+// ace         → "🏐 AS SERWISOWY!" + team name + optional player name
+// ball_out    → "🚫 AUT!" + team name
+// challenge   → "📢 CHALLANGE!" + brief pause animation
+// net_touch   → "📛 DOTKNIĘCIE SIATKI!" + team name
+// block       → "🖐 BLOK!" + team name + optional player
+// timeout     → "⏸ CZAS!" + team name
+// custom      → admin-defined text
+
+// Auto-dismiss after 3s, or admin can configure duration per event type
+// Banner position: just below the score bar (same width), z-index above all
+```
+
+```typescript
+// Challenge event has a special extended animation:
+// 1. "CHALLANGE!" banner slides in with suspense effect
+// 2. Pulsing glow for 2-3s while decision pending
+// 3. Result overlay: "UDANY ✓" or "NIEUDANY ✗" with color coding
+// (Challenge result is stored in event metadata)
+```
+
 ---
 
 ## Feature Details
@@ -583,6 +675,62 @@ When multiple admins edit simultaneously:
 - Live: Score tracking active, real-time updates
 - Paused: Timer stopped (if applicable)
 - Completed: Winner determined, advances in bracket
+
+### Match Events & Overlay Animations
+Match events are in-game occurrences (service ace, ball-out, challenge, net-touch, block, timeout) that the admin can log during a live match. They serve two purposes: triggering real-time animated banners on the OBS overlay, and accumulating statistics.
+
+- **Event types** (built-in): `ace` (as serwisowy), `ball_out` (aut), `challenge` (challange/wyzwanie), `net_touch` (dotknięcie siatki), `block` (blok), `timeout` (czas). A `custom` type allows free-text admin messages.
+- **Logging flow**: Admin taps an event button on the correct team side in the Match Control panel. If player stats tracking is enabled, a quick player picker appears. The event is saved with a score snapshot (team1/team2 points at that moment) and set number.
+- **Overlay reaction**: When the overlay receives a `match:event` socket event it displays an animated banner (see *Match Event Animations* above). Events queue to avoid overlap. Banner style, duration, and position are configurable from the overlay config page.
+- **Undo**: The most recent event can be undone from the match control panel. This removes it from the database and broadcasts a `match:event:deleted` event so the overlay can dismiss any active banner for that event.
+- **Feature toggle**: The entire event system is controlled by the tournament setting `matchEventsEnabled` (default: `true`). When disabled, the event panel is hidden from the match control UI and no event-related data is stored.
+
+### Fan View — Tournament Tracking Hub (`/display/fan`)
+The fan view is a dedicated full-page spectator screen for tracking tournament progress in real time.
+
+- **Primary purpose**: One place for fans to follow the tournament without admin controls.
+- **Core blocks**: Current live match, next match preview, and schedule/history of recent and upcoming matches.
+- **Status context**: Clear tournament/match state indicators (live, paused, completed) and timing context.
+- **Stats access**: Fan view must include a visible path to tournament stats (link/button to `/display/stats`) and may show compact live stat summaries.
+- **Realtime behavior**: All modules auto-refresh through socket events (score, status, bracket, and stats where enabled).
+
+### Player Info View (`/display/player`)
+Player view is a separate display route focused on teams and players preparing to play.
+
+- **Current match status**: Shows what is happening now on court.
+- **Next-up indicator**: Highlights when a team/player is expected to play next.
+- **Team context**: Displays roster and bracket position.
+- **Realtime behavior**: Syncs live with admin actions and tournament state changes.
+
+### Player Stats (Optional per Tournament)
+Player statistics are derived from match events attributed to individual players. This feature is **optional** and controlled by a tournament setting `playerStatsEnabled` (default: `false`).
+
+- **When enabled**:
+  - The `Player` table's `jersey_number` and `position` fields become editable in the Teams Manager.
+  - Event logging in Match Control shows a player picker after tapping an event button.
+  - Stats are aggregated from the `MatchEvent` table (count of aces, blocks, etc. per player across the tournament).
+  - A dedicated **Player Stats admin page** (`/admin/stats`) allows viewing and manually correcting per-player stats.
+  - Public stats views become available (see below).
+
+- **When disabled**:
+  - Event buttons still work (if `matchEventsEnabled` is true) but log events at team level only — no player attribution.
+  - Player picker is not shown.
+  - The player stats admin page is hidden from navigation.
+  - Jersey number and position fields are hidden from the Teams Manager.
+
+- **Stats aggregation**: Stats are computed on-the-fly from `MatchEvent` rows (no separate stats table). Queries group by `player_id` and `event_type`, filtered by tournament/match/team. This keeps the data source single and consistent — editing or deleting events automatically updates stats.
+
+### Public Stats Endpoints
+When player stats are enabled, additional public display routes become available:
+
+- **`/display/stats`** — Tournament stats dashboard showing:
+  - Top players by category (most aces, most blocks, etc.)
+  - Team comparison charts (events per team)
+  - Per-match event timeline
+- **`/display/stats/team/:id`** — Single team stats breakdown
+- **`/display/stats/player/:id`** — Single player stats card
+
+These pages are read-only and auto-refresh via socket events. They can be shown on secondary screens or linked from the fan view. When `playerStatsEnabled` is `false`, these routes show a "Statystyki graczy nie są włączone" message.
 
 ### Import/Export
 - Import teams from CSV: `name,shortName,color`
@@ -648,6 +796,13 @@ This section provides an overview of the implementation phases. Detailed TODO it
 8. **Phase 8: Production & Documentation** ❌ Not Started
    - Combined build ❌ | Polish documentation ❌ | Deployment guide ❌
 
+9. **Phase 9: Match Events & Player Stats** ❌ Not Started
+   - Match event logging (DB, service, socket handler) ❌
+   - Event panel in Match Control UI ❌
+   - Event-triggered overlay animations ❌
+   - Player stats (optional per tournament) ❌
+   - Public stats display pages ❌
+
 ---
 
 ## Notes & Considerations
@@ -668,3 +823,7 @@ This section provides an overview of the implementation phases. Detailed TODO it
    - Player substitutions
    - Timeout tracking
    - Multi-language support
+
+7. **Match Events & Stats**: Events are intentionally lightweight — each is a single row with a score snapshot, not a full play-by-play system. The `custom` event type allows admins to broadcast arbitrary messages to the overlay (e.g., "Przerwa techniczna"). Player stats are derived rather than stored separately, which avoids sync issues at the cost of slightly more complex queries. For school tournaments with ~50 matches this is negligible.
+
+8. **Stats Feature Toggle**: The `playerStatsEnabled` flag is designed to be flipped at any point during the tournament. Enabling it mid-tournament simply means earlier matches won't have player-attributed events. Disabling it hides the UI but retains all stored data.

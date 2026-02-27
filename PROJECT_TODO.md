@@ -142,19 +142,65 @@
   - [x] UX: typed confirmation for very dangerous actions (tournament delete)
   - [x] Add admin preference to opt-out of confirmations (conservative default = enabled)
 
-#### 3. Display Views
-- [ ] Fan View enhancements:
-  - [ ] Next match preview
-  - [ ] Match schedule/history
-  - [ ] Current status info
-- [ ] Player Info View (/display/player)
-  - [ ] Current match status
-  - [ ] "You're playing next" indicator
-  - [ ] Team roster
-  - [ ] Bracket position
-- [ ] Real-time live-sync between views
+#### 3. Shared Display Infrastructure
+- [ ] Shared data model for public display routes (current match, schedule snapshot, tournament status)
+- [ ] Reusable socket subscriptions/state sync for all display pages
 
-#### 4. OBS Overlay Enhancements
+#### 4. Match Events & Overlay Animations
+- [ ] Database: `matchEvents` table (id, matchId, eventType, team, playerId, setNumber, score snapshot, metadata, createdAt)
+- [ ] Database: extend `players` table with `jersey_number` (int, nullable) and `position` (text, nullable)
+- [ ] Tournament settings: add `matchEventsEnabled` (default true) and `playerStatsEnabled` (default false) flags
+- [ ] Event service (`server/services/event.service.ts`)
+  - [ ] `logEvent(matchId, eventType, team, playerId?, metadata?)` — validate, snapshot score, insert
+  - [ ] `deleteEvent(eventId)` — remove single event (undo)
+  - [ ] `clearMatchEvents(matchId)` — remove all events for a match
+  - [ ] `getMatchEvents(matchId)` — list events for a match (ordered by time)
+  - [ ] `getMatchStats(matchId)` — aggregate event counts by type and team
+  - [ ] `getTeamStats(tournamentId, teamId)` — aggregate across matches
+  - [ ] `getPlayerStats(tournamentId, playerId?)` — per-player aggregation
+- [ ] Socket handler (`server/socket/handlers/event.ts`)
+  - [ ] `admin:event:log` — log event, broadcast `match:event` to match room
+  - [ ] `admin:event:delete` — delete event, broadcast `match:event:deleted`
+  - [ ] `admin:event:clear` — clear events, broadcast `match:events:cleared`
+  - [ ] `stats:match:get` — return match events/stats (read-only, any client)
+  - [ ] `stats:team:get` — return team stats
+  - [ ] `stats:player:get` — return player stats
+  - [ ] Register handler in `server/socket/index.ts`
+- [ ] Zod validation schemas for event payloads (`server/utils/validation.ts`)
+- [ ] Match Control UI: Event Panel component (`src/components/match/EventPanel.tsx`)
+  - [ ] Two-column layout (team1 events | team2 events)
+  - [ ] Icon buttons for each event type (ace, ball-out, challenge, net-touch, block, timeout)
+  - [ ] Collapsible panel (toggle button in info bar)
+  - [ ] Default collapsed on mobile, expanded on desktop/tablet
+  - [ ] Quick player picker overlay (when `playerStatsEnabled` is true)
+  - [ ] "Ostatnie" row showing last logged event with inline undo button
+  - [ ] Responsive: chip row on narrow screens, grid on wider
+  - [ ] Toast confirmation on event log
+  - [ ] Hide panel entirely when `matchEventsEnabled` is false
+- [ ] Match Control UI: integrate EventPanel into MatchControl.tsx grid layout
+  - [ ] Add as collapsible row between set info and footer
+  - [ ] Keyboard shortcuts for common events (optional, avoid conflict with score shortcuts)
+
+#### 5. Fan View — Tournament Tracking Hub (`/display/fan`)
+- [ ] Fan page as a dedicated tournament-tracking screen (single-page hub for spectators)
+  - [ ] Prominent current match module (live score + sets + status)
+  - [ ] Next match preview
+  - [ ] Match schedule/history (upcoming + recent results)
+  - [ ] Current tournament status info (live/paused/completed)
+- [ ] Fan-facing stats access
+  - [ ] Add clear entry point to stats views from fan page (`/display/stats`)
+  - [ ] Show compact stats preview cards on fan page (when enabled)
+  - [ ] Show fallback message when player stats are disabled
+- [ ] Real-time live-sync for fan page modules (match, bracket, status, stats)
+
+#### 6. Player Info View (`/display/player`)
+- [ ] Current match status
+- [ ] "You're playing next" indicator
+- [ ] Team roster
+- [ ] Bracket position
+- [ ] Real-time live-sync between player view and other displays
+
+#### 7. OBS Overlay Enhancements
 - [ ] Info rotator component
   - [ ] Next match preview rotation
   - [ ] Mini bracket view
@@ -170,8 +216,24 @@
   - [ ] Component visibility toggles
   - [ ] Rotation timing
   - [ ] Animation speed controls
+- [ ] Event banner animation component (`src/components/overlay/EventBanner.tsx`)
+  - [ ] Listen for `match:event` socket events
+  - [ ] Animated banner that slides in from the team side
+  - [ ] Auto-dismiss after configurable duration (~3s default)
+  - [ ] Event queue (display one at a time, FIFO)
+  - [ ] Visual style varies by event type (icon, color, text)
+  - [ ] Challenge event: extended animation with suspense + result display
+  - [ ] Dismiss on `match:event:deleted` if banner still showing
+- [ ] Integrate EventBanner into StreamOverlay.tsx
+  - [ ] Position below score bar
+  - [ ] Ensure transparent background compatibility
+- [ ] Overlay config: add event animation settings
+  - [ ] Enable/disable event banners per type
+  - [ ] Banner duration slider
+  - [ ] Animation speed control
+  - [ ] Banner position (top/bottom of score bar)
 
-#### 5. Stability & Reliability
+#### 8. Stability & Reliability
 - [ ] Multi-admin conflict resolution
   - [ ] "Typing/editing" indicators (presence)
   - [ ] Soft-lock for exclusive editing
@@ -184,7 +246,7 @@
 - [x] Mobile-responsive admin interface (match control tablet-first layout)
 - [ ] Cross-browser testing (Chrome, Firefox, Edge, Safari)
 
-#### 6. Production & Deployment
+#### 9. Production & Deployment
 - [x] Combine frontend and backend builds
   - [x] Serve React build from Express
   - [ ] Production environment variables
@@ -201,7 +263,7 @@
   - [ ] Troubleshooting guide
 - [ ] Add helpful UI tooltips
 
-#### 7. Testing & QA
+#### 10. Testing & QA
 - [ ] Unit tests for services (bracket, match, scoring)
 - [ ] Integration tests for Socket.io events
 - [ ] UI component tests (React Testing Library)
@@ -210,12 +272,38 @@
 - [ ] Connection loss / reconnect scenarios
 - [ ] Data persistence verification
 
-#### 8. UI Polish & Components
+#### 11. UI Polish & Components
 - [ ] Build base UI component library
   - [ ] Button, Input, Select, Modal (enhance existing)
   - [ ] Card, Badge, Tabs (enhance existing)
 - [ ] Sound effects (optional, configurable)
 - [ ] Add helpful tooltips across the UI
+
+#### 12. Player Stats (Optional per Tournament)
+- [ ] Teams Manager: show jersey_number and position fields when `playerStatsEnabled` is true
+  - [ ] Inline editable fields in player list
+  - [ ] Hide fields when setting is false
+- [ ] Player Stats admin page (`/admin/stats`)
+  - [ ] Table of all players with event counts (aces, blocks, etc.)
+  - [ ] Sortable columns
+  - [ ] Filter by team
+  - [ ] Match-by-match breakdown expandable per player
+  - [ ] Hide page from navigation when `playerStatsEnabled` is false
+- [ ] Public stats display page (`/display/stats`)
+  - [ ] Top players leaderboard (most aces, blocks, etc.)
+  - [ ] Team comparison (events per team)
+  - [ ] Per-match event timeline
+  - [ ] Auto-refresh via socket events
+  - [ ] Show "disabled" message when `playerStatsEnabled` is false
+- [ ] Public team stats page (`/display/stats/team/:id`)
+  - [ ] Team event breakdown
+  - [ ] Player roster with stats
+- [ ] Public player stats page (`/display/stats/player/:id`)
+  - [ ] Player stats card with all event counts
+  - [ ] Match history with events
+- [ ] Add routes for stats pages in React Router
+- [ ] Zustand store for events/stats data (`src/stores/event.store.ts`)
+- [ ] Navigation links: add stats to admin sidebar and display navigation (conditionally)
 
 ---
 
