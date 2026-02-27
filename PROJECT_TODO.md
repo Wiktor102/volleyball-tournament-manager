@@ -112,6 +112,7 @@
 - [x] Tournament service (create, update, delete, list with full CRUD)
 - [x] Player service (CRUD + team assignment)
 - [x] Scoring service (pluggable modes, persist config per tournament)
+- [ ] Tournament socket.io events (admin notifications, live status updates)
 - [x] Scoring modes:
   - [x] Points (simple increment)
   - [x] Sets (with auto-win, tie-break)
@@ -176,6 +177,7 @@
 - [ ] Comprehensive error handling
   - [ ] Network errors with recovery UI
   - [ ] Database errors with logging
+  - [ ] Error boundaries and loading states
   - [x] Socket disconnection handling (reconnect with state refresh)
 - [ ] Mobile-responsive admin interface
 - [ ] Cross-browser testing (Chrome, Firefox, Edge, Safari)
@@ -206,70 +208,12 @@
 - [ ] Connection loss / reconnect scenarios
 - [ ] Data persistence verification
 
----
-
-## Implementation Phases (from plan.md, mapped to above)
-
-### Phase 2: Core Backend
-- Implement database models and services
-  - [x] Team service (CRUD)
-  - [ ] Tournament service (CRUD)
-  - [ ] Player service (CRUD)
-  - [x] Bracket service (generation, updates)
-  - [x] Match service (CRUD, score management)
-  - [ ] Scoring service (pluggable scoring modes)
-- Implement Socket.io event handlers
-  - [ ] Tournament events
-  - [x] Match events (score updates, status)
-  - [x] Bracket events
-  - [x] Team events
-- [ ] Add conflict resolution for concurrent edits
-
-### Phase 3: Shared Infrastructure
-- [x] Create Socket.io React context and hooks
-- [x] Implement Zustand stores with Socket.io sync
+#### 8. UI Polish & Components
 - [ ] Build base UI component library
   - [ ] Button, Input, Select, Modal (enhance existing)
   - [ ] Card, Badge, Tabs (enhance existing)
-  - [ ] Loading states, error boundaries
-- [x] Set up React Router with route structure
-
-### Phase 4: Admin Interface
-- [x] Admin Dashboard page
-- [ ] Tournament Setup wizard
-- [x] Bracket Editor page
-- [x] Match Control page
-- [x] Teams Manager page
-
-### Phase 5: Display Views
-- [x] Fan View (basic with sets)
-  - [ ] Set history (done)
-  - [ ] Next match preview
-- [ ] Player Info View
-- [x] Bracket Display
-
-### Phase 6: OBS Streaming Overlay
-- [x] Overlay page with transparent background
-- [ ] Score bar component (basic done, animations done)
-- [ ] Info rotator component
-- [ ] Celebration animations
-- [ ] Overlay configuration page
-
-### Phase 7: Polish & Testing
-- [x] Add keyboard shortcuts for score control
-- [ ] Implement undo/redo for admin actions
-- [ ] Add sound effects (optional, configurable)
-- [x] Comprehensive error handling (partial)
-- [x] Connection loss handling (reconnect + state sync)
-- [ ] Mobile-responsive admin interface
-- [ ] Cross-browser testing
-
-### Phase 8: Documentation & Deployment
-- [ ] Write usage documentation (Polish)
-- [ ] Create "getting started" guide
-- [ ] Add helpful tooltips in UI
-- [x] Create production start script
-- [ ] Test portable deployment (USB drive scenario)
+- [ ] Sound effects (optional, configurable)
+- [ ] Add helpful tooltips across the UI
 
 ---
 
@@ -291,9 +235,3 @@ Completed:
 13. ✅ Production build setup (npm run build && npm start)
 14. ✅ Timed scoring mode with timer UI (pause/resume, countdown, overtime display)
 15. ✅ Per-round scoring overrides (e.g., final uses timed mode while other rounds use sets)
-
-Next priorities:
-- Player Info View (/display/player)
-- Fan View next match preview
-- Overlay info rotator
-- Documentation & deployment guide
