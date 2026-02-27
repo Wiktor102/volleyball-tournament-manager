@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout";
+import { RequireAuth } from "./components/RequireAuth";
+import { LoginPage } from "./pages/LoginPage";
 import { Dashboard } from "./pages/admin/Dashboard";
 import { TournamentSetup } from "./pages/admin/TournamentSetup";
 import { TournamentList } from "./pages/admin/TournamentList";
@@ -21,8 +23,15 @@ export default function App() {
 	return (
 		<BrowserRouter>
 			<Routes>
-				<Route path="/" element={<Navigate to="/admin" replace />} />
-				<Route element={<AdminLayout />}>
+				<Route path="/" element={<Navigate to="/display/fan" replace />} />
+				<Route path="/login" element={<LoginPage />} />
+				<Route
+					element={
+						<RequireAuth>
+							<AdminLayout />
+						</RequireAuth>
+					}
+				>
 					<Route path="/admin" element={<Dashboard />} />
 					<Route path="/admin/tournaments" element={<TournamentList />} />
 					<Route path="/admin/tournament/new" element={<TournamentSetup />} />

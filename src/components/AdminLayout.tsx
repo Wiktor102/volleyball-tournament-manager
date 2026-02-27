@@ -1,15 +1,22 @@
 import { useState, useRef, useEffect } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSocket } from "../socket/context";
 import { useToast } from "./Toast";
 import { getAdminPreferences, setAdminPreferences } from "./ConfirmModal";
 import { useTournamentStore } from "../stores/tournament.store";
+import { logout } from "../utils/auth";
 import "../styles/admin.css";
 
 export function AdminLayout() {
 	const { connected, reconnecting } = useSocket();
 	const { addToast } = useToast();
 	const location = useLocation();
+	const navigate = useNavigate();
+
+	async function handleLogout() {
+		await logout();
+		navigate("/login", { replace: true });
+	}
 	const { tournament } = useTournamentStore();
 	const [externalOpenPath, setExternalOpenPath] = useState<string | null>(null);
 	const [settingsOpenPath, setSettingsOpenPath] = useState<string | null>(null);
@@ -205,10 +212,36 @@ export function AdminLayout() {
 							</div>
 						)}
 					</div>
+
+					{/* Logout button */}
+					<button
+						type="button"
+						className="admin-topbar__icon-btn"
+						onClick={handleLogout}
+						aria-label="Wyloguj"
+						title="Wyloguj"
+					>
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+							<polyline points="16 17 21 12 16 7" />
+							<line x1="21" y1="12" x2="9" y2="12" />
+						</svg>
+					</button>
 				</div>
 			</header>
 
-		<div className={`admin-container ${isBracketPage ? "admin-container--bracket" : ""} ${isMatchControlPage ? "admin-container--match-control" : ""}`}>
+			<div
+				className={`admin-container ${isBracketPage ? "admin-container--bracket" : ""} ${isMatchControlPage ? "admin-container--match-control" : ""}`}
+			>
 				<Outlet />
 			</div>
 		</div>

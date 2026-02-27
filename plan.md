@@ -796,12 +796,20 @@ This section provides an overview of the implementation phases. Detailed TODO it
 8. **Phase 8: Production & Documentation** ❌ Not Started
    - Combined build ❌ | Polish documentation ❌ | Deployment guide ❌
 
-9. **Phase 9: Match Events & Player Stats** ❌ Not Started
-   - Match event logging (DB, service, socket handler) ❌
-   - Event panel in Match Control UI ❌
-   - Event-triggered overlay animations ❌
-   - Player stats (optional per tournament) ❌
-   - Public stats display pages ❌
+9. **Phase 9: Match Events & Player Stats** ✅ Complete
+   - Match event logging (DB, service, socket handler) ✅
+   - Event panel in Match Control UI ✅
+   - Event-triggered overlay animations ✅
+   - Player stats (optional per tournament) ✅
+   - Public stats display pages ✅
+
+10. **Phase 10: Security** ✅ Complete
+    - Password-protected admin panel (`ADMIN_PASSWORD` env var) ✅
+    - Server-side token issuance & validation (in-memory, LAN-appropriate) ✅
+    - `RequireAuth` component guarding all `/admin/*` routes ✅
+    - Login page (`/login`) with Polish UI ✅
+    - Logout button in admin top bar ✅
+    - Root `/` redirects to `/display/fan` by default ✅
 
 ---
 
@@ -827,3 +835,4 @@ This section provides an overview of the implementation phases. Detailed TODO it
 7. **Match Events & Stats**: Events are intentionally lightweight — each is a single row with a score snapshot, not a full play-by-play system. The `custom` event type allows admins to broadcast arbitrary messages to the overlay (e.g., "Przerwa techniczna"). Player stats are derived rather than stored separately, which avoids sync issues at the cost of slightly more complex queries. For school tournaments with ~50 matches this is negligible.
 
 8. **Stats Feature Toggle**: The `playerStatsEnabled` flag is designed to be flipped at any point during the tournament. Enabling it mid-tournament simply means earlier matches won't have player-attributed events. Disabling it hides the UI but retains all stored data.
+9. **Admin Authentication**: The admin panel is protected by a single shared password stored in `ADMIN_PASSWORD` (env var, defaults to `"admin"`). Authentication uses short-lived random tokens issued by the server and stored in `localStorage`. Tokens live as long as the server process runs (cleared on restart), which is appropriate for a LAN tournament event. Display routes (`/display/*`, `/overlay`) remain publicly accessible — no auth required. The root `/` redirects to the fan view so spectator screens always land on the right page.

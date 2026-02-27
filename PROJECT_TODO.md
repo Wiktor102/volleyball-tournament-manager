@@ -103,6 +103,15 @@
 - [x] Production start script (npm start)
 - [x] Frontend served from Express in production
 
+### Phase 9: Security
+- [x] Password auth for admin routes (`ADMIN_PASSWORD` env var, default `"admin"`)
+  - [x] Server: `POST /api/auth/login`, `GET /api/auth/check`, `POST /api/auth/logout` (in-memory token set)
+  - [x] Client: `src/utils/auth.ts` (login/logout/checkAuth helpers, token in `localStorage`)
+  - [x] `src/components/RequireAuth.tsx` — wraps all `/admin/*` routes, redirects to `/login` when unauthenticated
+  - [x] `src/pages/LoginPage.tsx` — Polish-language password form
+  - [x] Logout button added to admin top bar
+  - [x] Root `/` now redirects to `/display/fan` (fan view) instead of `/admin`
+
 ---
 
 ## In Progress / Next Priority
@@ -395,3 +404,18 @@ Remaining (not yet implemented):
 - §9 Deployment: Polish docs, deployment guide, USB portable test
 - §10 Testing: unit/integration/UI tests
 - §11 UI Polish: component library, sound effects, tooltips
+
+---
+
+## Session Work (Feb 27, 2026 — Security Update)
+
+Completed:
+24. ✅ Password authentication for admin routes
+    - `ADMIN_PASSWORD` env variable (defaults to `"admin"` if unset)
+    - Server auth endpoints: `/api/auth/login`, `/api/auth/check`, `/api/auth/logout`
+    - In-memory token store (cleared on server restart)
+    - `src/utils/auth.ts` — shared auth helpers (login, logout, checkAuth, getToken)
+    - `RequireAuth` component wraps all `/admin/*` routes
+    - `LoginPage` with Polish-language password form
+    - Logout button added to admin top bar
+    - Root `/` redirects to `/display/fan` by default

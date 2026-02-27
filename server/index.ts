@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -8,6 +9,44 @@ import { registerHandlers } from "./socket/handlers";
 
 const app = express();
 app.use(express.json());
+
+// In-memory token store — tokens are cleared on server restart (fine for LAN use)
+const activeTokens = new Set<string>();
+
+// ---------- Auth routes ----------
+
+// POST /api/auth/login — verify password, issue token
+app.post("/api/auth/login", (req, res) => {
+	const { password } = req.body as { password?: string };
+	if (!password || password !== config.adminPassword) {
+		res.status(401).json({ error: "Nieprawidłowe hasło" });
+		return;
+	}
+	const token = crypto.randomBytes(32).toString("hex");
+	activeTokens.add(token);
+	res.json({ token });
+});
+
+// GET /api/auth/check — validate token from Authorization header
+app.get("/api/auth/check", (req, res) => {
+	const auth = req.headers.authorization ?? "";
+	const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+	if (!token || !activeTokens.has(token)) {
+		res.status(401).json({ error: "Unauthorized" });
+		return;
+	}
+	res.json({ ok: true });
+});
+
+// POST /api/auth/logout — revoke token
+app.post("/api/auth/logout", (req, res) => {
+	const auth = req.headers.authorization ?? "";
+	const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+	if (token) activeTokens.delete(token);
+	res.json({ ok: true });
+});
+
+// ---------- End Auth routes ----------
 
 // Basic health
 app.get("/api/health", (_req, res) => {
