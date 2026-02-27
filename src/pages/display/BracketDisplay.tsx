@@ -4,7 +4,7 @@ import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import '../../styles/admin.css'
 
-type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string }
 
 type BracketMatch = {
   id: string
@@ -29,11 +29,11 @@ export function BracketDisplay() {
   const refreshState = useCallback(() => {
     if (!socket) return
     socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setTournament(ack.data)
       // Load bracket
       socket.emit('bracket:list', { tournamentId: ack.data.id }, (bracketAck: Ack<BracketMatch[]>) => {
-        if (bracketAck.ok) setBracket(bracketAck.data)
+        if (bracketAck.ok && bracketAck.data) setBracket(bracketAck.data)
       })
     })
   }, [socket, setTournament])
@@ -49,7 +49,7 @@ export function BracketDisplay() {
     if (!socket) return
 
     socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setTournament(ack.data)
     })
 
@@ -72,7 +72,7 @@ export function BracketDisplay() {
   const load = () => {
     if (!socket || !tournament) return
     socket.emit('bracket:list', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setBracket(ack.data)
     })
   }

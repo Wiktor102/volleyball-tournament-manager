@@ -1,307 +1,350 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useSocket } from '../../socket/context'
-import { useMatchStore, type MatchScore } from '../../stores/match.store'
-import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
-import { useToast } from '../../components/Toast'
-import '../../styles/admin.css'
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { useSocket } from "../../socket/context";
+import { useMatchStore, type MatchScore } from "../../stores/match.store";
+import { useTournamentStore, type Tournament, type TournamentState } from "../../stores/tournament.store";
+import { useToast } from "../../components/Toast";
+import "../../styles/admin.css";
 
-type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
 
 type BracketMatch = {
-  id: string
-  tournamentId: string
-  roundNumber: number
-  matchNumber: number
-  positionInRound: number
-  team1Id: string | null
-  team2Id: string | null
-  winnerId: string | null
-  status: 'pending' | 'live' | 'completed'
-  isThirdPlaceMatch: boolean
-  nextMatchId: string | null
-}
+	id: string;
+	tournamentId: string;
+	roundNumber: number;
+	matchNumber: number;
+	positionInRound: number;
+	team1Id: string | null;
+	team2Id: string | null;
+	winnerId: string | null;
+	status: "pending" | "live" | "completed";
+	isThirdPlaceMatch: boolean;
+	nextMatchId: string | null;
+};
 
 export function Dashboard() {
-  const { socket, connected, reconnecting, onReconnect } = useSocket()
-  const { tournament, teams, setTournament, setTeams } = useTournamentStore()
-  const { setMatchId, setMatchTeams, setScore } = useMatchStore()
-  const { addToast } = useToast()
-  const [tournamentName, setTournamentName] = useState('')
-  const [bracket, setBracket] = useState<BracketMatch[]>([])
-  const [saving, setSaving] = useState(false)
+	const { socket, connected, reconnecting, onReconnect } = useSocket();
+	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
+	const { setMatchId, setMatchTeams, setScore } = useMatchStore();
+	const { addToast } = useToast();
+	const [tournamentName, setTournamentName] = useState("");
+	const [bracket, setBracket] = useState<BracketMatch[]>([]);
+	const [saving, setSaving] = useState(false);
+	const [loaded, setLoaded] = useState(false);
 
-  // Function to refresh all state from server
-  const refreshState = useCallback(() => {
-    if (!socket) return
-    socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
-      setTournament(ack.data)
-      setTournamentName(ack.data.name)
-      
-      // Load bracket
-      socket.emit('bracket:list', { tournamentId: ack.data.id }, (bracketAck: Ack<BracketMatch[]>) => {
-        if (bracketAck.ok) setBracket(bracketAck.data)
-      })
-    })
-  }, [socket, setTournament])
+	// Function to refresh all state from server
+	const refreshState = useCallback(() => {
+		if (!socket) return;
+		socket.emit("tournament:default", null, (ack: Ack<Tournament>) => {
+			setLoaded(true);
+			if (!ack.ok || !ack.data) return;
+			setTournament(ack.data);
+			setTournamentName(ack.data.name);
 
-  // Subscribe to reconnect events
-  useEffect(() => {
-    return onReconnect(() => {
-      refreshState()
-      addToast('Połączono ponownie - odświeżam stan', 'info')
-    })
-  }, [onReconnect, refreshState, addToast])
+			// Load bracket
+			socket.emit("bracket:list", { tournamentId: ack.data.id }, (bracketAck: Ack<BracketMatch[]>) => {
+				if (bracketAck.ok && bracketAck.data) setBracket(bracketAck.data);
+			});
+		});
+	}, [socket, setTournament]);
 
-  useEffect(() => {
-    if (!socket) return
-    socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
-      setTournament(ack.data)
-      setTournamentName(ack.data.name)
-    })
+	// Subscribe to reconnect events
+	useEffect(() => {
+		return onReconnect(() => {
+			refreshState();
+			addToast("Połączono ponownie - odświeżam stan", "info");
+		});
+	}, [onReconnect, refreshState, addToast]);
 
-    const onTournamentUpdated = (t: Tournament) => {
-      setTournament(t)
-      setTournamentName(t.name)
-    }
-    const onMatchScore = (s: MatchScore) => setScore(s)
-    const onState = (state: TournamentState) => {
-      setTournament(state.tournament)
-      setTournamentName(state.tournament.name)
-      setTeams(state.teams)
-      if (state.currentMatch?.id) {
-        setMatchId(state.currentMatch.id)
-        setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null)
-      }
-      if (state.score) setScore(state.score as MatchScore)
-    }
-    const onBracket = (items: BracketMatch[]) => setBracket(items)
+	useEffect(() => {
+		if (!socket) return;
+		socket.emit("tournament:default", null, (ack: Ack<Tournament>) => {
+			setLoaded(true);
+			if (!ack.ok || !ack.data) return;
+			setTournament(ack.data);
+			setTournamentName(ack.data.name);
+		});
 
-    socket.on('tournament:updated', onTournamentUpdated)
-    socket.on('match:score', onMatchScore)
-    socket.on('tournament:state', onState)
-    socket.on('bracket:updated', onBracket)
+		const onTournamentUpdated = (t: Tournament) => {
+			setTournament(t);
+			setTournamentName(t.name);
+		};
+		const onMatchScore = (s: MatchScore) => setScore(s);
+		const onState = (state: TournamentState) => {
+			setTournament(state.tournament);
+			setTournamentName(state.tournament.name);
+			setTeams(state.teams);
+			if (state.currentMatch?.id) {
+				setMatchId(state.currentMatch.id);
+				setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null);
+			}
+			if (state.score) setScore(state.score as MatchScore);
+		};
+		const onBracket = (items: BracketMatch[]) => setBracket(items);
 
-    return () => {
-      socket.off('tournament:updated', onTournamentUpdated)
-      socket.off('match:score', onMatchScore)
-      socket.off('tournament:state', onState)
-      socket.off('bracket:updated', onBracket)
-    }
-  }, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams])
+		socket.on("tournament:updated", onTournamentUpdated);
+		socket.on("match:score", onMatchScore);
+		socket.on("tournament:state", onState);
+		socket.on("bracket:updated", onBracket);
 
-  useEffect(() => {
-    if (!socket || !tournament) return
-    socket.emit('bracket:list', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
-      if (ack.ok) setBracket(ack.data)
-    })
-  }, [socket, tournament?.id])
+		return () => {
+			socket.off("tournament:updated", onTournamentUpdated);
+			socket.off("match:score", onMatchScore);
+			socket.off("tournament:state", onState);
+			socket.off("bracket:updated", onBracket);
+		};
+	}, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams]);
 
-  const saveTournamentName = () => {
-    if (!socket || !tournament || !tournamentName.trim()) return
-    setSaving(true)
-    socket.emit(
-      'admin:tournament:update',
-      { tournamentId: tournament.id, patch: { name: tournamentName.trim() } },
-      () => setSaving(false)
-    )
-  }
+	useEffect(() => {
+		if (!socket || !tournament) return;
+		socket.emit("bracket:list", { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
+			if (ack.ok && ack.data) setBracket(ack.data);
+		});
+	}, [socket, tournament, tournament?.id]);
 
-  const liveMatch = bracket.find((m) => m.status === 'live')
-  const hasTeams = teams.length >= 2
-  const hasBracket = bracket.length > 0
-  const pendingMatches = bracket.filter((m) => m.status === 'pending' && m.team1Id && m.team2Id)
+	const saveTournamentName = () => {
+		if (!socket || !tournament || !tournamentName.trim()) return;
+		setSaving(true);
+		socket.emit("admin:tournament:update", { tournamentId: tournament.id, patch: { name: tournamentName.trim() } }, () =>
+			setSaving(false)
+		);
+	};
 
-  const getWorkflowStep = () => {
-    if (!hasTeams) return 1
-    if (!hasBracket) return 2
-    if (liveMatch) return 4
-    if (pendingMatches.length > 0) return 3
-    return 3
-  }
-  const currentStep = getWorkflowStep()
+	const liveMatch = bracket.find(m => m.status === "live");
+	const hasTeams = teams.length >= 2;
+	const hasBracket = bracket.length > 0;
+	const pendingMatches = bracket.filter(m => m.status === "pending" && m.team1Id && m.team2Id);
 
-  const team1 = liveMatch ? teams.find((t) => t.id === liveMatch.team1Id) : null
-  const team2 = liveMatch ? teams.find((t) => t.id === liveMatch.team2Id) : null
+	const getWorkflowStep = () => {
+		if (!hasTeams) return 1;
+		if (!hasBracket) return 2;
+		if (liveMatch) return 4;
+		if (pendingMatches.length > 0) return 3;
+		return 3;
+	};
+	const currentStep = getWorkflowStep();
 
-  return (
-    <div className="admin-page">
-      <div className="admin-container">
-        <header className="admin-header">
-          <div className="flex items-center gap-2">
-            <h1>🏐 Panel administratora</h1>
-            <span className={`status-badge ${connected ? 'connected' : reconnecting ? 'reconnecting' : 'disconnected'}`}>
-              {connected ? 'Połączono' : reconnecting ? 'Łączenie...' : 'Rozłączono'}
-            </span>
-          </div>
-          <nav className="admin-nav">
-            <Link to="/admin/teams">Drużyny</Link>
-            <Link to="/admin/bracket">Drabinka</Link>
-            <Link to="/display/fan">Widok fanów</Link>
-            <Link to="/display/bracket">Podgląd drabinki</Link>
-            <Link to="/overlay">Overlay</Link>
-          </nav>
-        </header>
+	const team1 = liveMatch ? teams.find(t => t.id === liveMatch.team1Id) : null;
+	const team2 = liveMatch ? teams.find(t => t.id === liveMatch.team2Id) : null;
 
-        {/* Workflow Steps */}
-        <div className="workflow">
-          <div className={`workflow-step ${currentStep > 1 ? 'completed' : currentStep === 1 ? 'active' : ''}`}>
-            <span className="workflow-step-number">{currentStep > 1 ? '✓' : '1'}</span>
-            <span>Dodaj drużyny</span>
-          </div>
-          <span className="workflow-arrow">→</span>
-          <div className={`workflow-step ${currentStep > 2 ? 'completed' : currentStep === 2 ? 'active' : ''}`}>
-            <span className="workflow-step-number">{currentStep > 2 ? '✓' : '2'}</span>
-            <span>Wygeneruj drabinkę</span>
-          </div>
-          <span className="workflow-arrow">→</span>
-          <div className={`workflow-step ${currentStep > 3 ? 'completed' : currentStep === 3 ? 'active' : ''}`}>
-            <span className="workflow-step-number">{currentStep > 3 ? '✓' : '3'}</span>
-            <span>Rozgrywaj mecze</span>
-          </div>
-        </div>
+	// Show a brief loading / empty-state while the socket responds
+	if (!tournament) {
+		return (
+			<div className="admin-page">
+				<div className="admin-container">
+					<header className="admin-header">
+						<div className="flex items-center gap-2">
+							<h1>🏐 Panel administratora</h1>
+						</div>
+					</header>
+					<div className="card">
+						<div className="empty-state">
+							<div className="empty-state-icon">🏆</div>
+							<div className="empty-state-text">
+								{loaded ? "Brak turnieju. Utwórz aby rozpocząć." : "Ładowanie..."}
+							</div>
+							{loaded && (
+								<Link to="/admin/tournament/new" className="btn btn-primary" style={{ marginTop: 16 }}>
+									+ Utwórz turniej
+								</Link>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
-        {/* Tournament Settings */}
-        <div className="card">
-          <div className="card-header">
-            <h2>Turniej</h2>
-            {tournament && (
-              <span className={`status-badge ${tournament.status}`}>
-                {tournament.status === 'draft' ? 'Szkic' : tournament.status === 'live' ? 'W trakcie' : 'Zakończony'}
-              </span>
-            )}
-          </div>
-          {tournament ? (
-            <>
-              <div className="form-row">
-                <div className="form-group" style={{ flex: 2 }}>
-                  <label className="form-label">Nazwa turnieju</label>
-                  <input
-                    className="form-input"
-                    value={tournamentName}
-                    onChange={(e) => setTournamentName(e.target.value)}
-                    placeholder="Nazwa turnieju"
-                  />
-                </div>
-                <div className="form-group" style={{ flex: 0 }}>
-                  <label className="form-label">&nbsp;</label>
-                  <button
-                    className="btn btn-primary"
-                    onClick={saveTournamentName}
-                    disabled={saving || tournamentName === tournament.name}
-                  >
-                    {saving ? 'Zapisywanie...' : 'Zapisz'}
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2" style={{ marginTop: 12 }}>
-                <Link to={`/admin/tournament/${tournament.id}`} className="btn btn-secondary btn-sm">
-                  ⚙️ Ustawienia punktacji
-                </Link>
-                <Link to="/admin/tournament/new" className="btn btn-secondary btn-sm">
-                  + Nowy turniej
-                </Link>
-              </div>
-              {tournament.settings?.scoring && (
-                <div className="info-message" style={{ marginTop: 12 }}>
-                  <strong>Tryb:</strong>{' '}
-                  {tournament.settings.scoring.mode === 'sets'
-                    ? `Do ${tournament.settings.scoring.setsToWin} setów (po ${tournament.settings.scoring.pointsToWinSet} pkt)`
-                    : 'Tylko punkty'}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-muted">Ładowanie...</div>
-          )}
-        </div>
+	return (
+		<div className="admin-page">
+			<div className="admin-container">
+				<header className="admin-header">
+					<div className="flex items-center gap-2">
+						<h1>🏐 Panel administratora</h1>
+						<span
+							className={`status-badge ${connected ? "connected" : reconnecting ? "reconnecting" : "disconnected"}`}
+						>
+							{connected ? "Połączono" : reconnecting ? "Łączenie..." : "Rozłączono"}
+						</span>
+					</div>
+					<nav className="admin-nav">
+						<Link to="/admin/tournaments">Turnieje</Link>
+						<Link to="/admin/teams">Drużyny</Link>
+						<Link to="/admin/bracket">Drabinka</Link>
+						<Link to="/display/fan">Widok fanów</Link>
+						<Link to="/display/bracket">Podgląd drabinki</Link>
+						<Link to="/overlay">Overlay</Link>
+					</nav>
+				</header>
 
-        {/* Quick Stats */}
-        <div className="grid grid-3">
-          <div className="card">
-            <div className="card-header">
-              <h3>Drużyny</h3>
-            </div>
-            <div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>{teams.length}</div>
-            <Link to="/admin/teams" className="btn btn-secondary btn-sm">
-              {teams.length === 0 ? 'Dodaj drużyny' : 'Zarządzaj drużynami'}
-            </Link>
-          </div>
+				{/* Workflow Steps */}
+				<div className="workflow">
+					<div className={`workflow-step ${currentStep > 1 ? "completed" : currentStep === 1 ? "active" : ""}`}>
+						<span className="workflow-step-number">{currentStep > 1 ? "✓" : "1"}</span>
+						<span>Dodaj drużyny</span>
+					</div>
+					<span className="workflow-arrow">→</span>
+					<div className={`workflow-step ${currentStep > 2 ? "completed" : currentStep === 2 ? "active" : ""}`}>
+						<span className="workflow-step-number">{currentStep > 2 ? "✓" : "2"}</span>
+						<span>Wygeneruj drabinkę</span>
+					</div>
+					<span className="workflow-arrow">→</span>
+					<div className={`workflow-step ${currentStep > 3 ? "completed" : currentStep === 3 ? "active" : ""}`}>
+						<span className="workflow-step-number">{currentStep > 3 ? "✓" : "3"}</span>
+						<span>Rozgrywaj mecze</span>
+					</div>
+				</div>
 
-          <div className="card">
-            <div className="card-header">
-              <h3>Drabinka</h3>
-            </div>
-            <div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>
-              {bracket.length > 0 ? `${bracket.filter((m) => m.status === 'completed').length}/${bracket.length}` : '—'}
-            </div>
-            <Link to="/admin/bracket" className="btn btn-secondary btn-sm">
-              {bracket.length === 0 ? 'Wygeneruj drabinkę' : 'Edytuj drabinkę'}
-            </Link>
-          </div>
+				{/* Tournament Settings */}
+				<div className="card">
+					<div className="card-header">
+						<h2>Turniej</h2>
+						{tournament && (
+							<span className={`status-badge ${tournament.status}`}>
+								{tournament.status === "draft"
+									? "Szkic"
+									: tournament.status === "live"
+										? "W trakcie"
+										: "Zakończony"}
+							</span>
+						)}
+					</div>
+					{tournament ? (
+						<>
+							<div className="form-row">
+								<div className="form-group" style={{ flex: 2 }}>
+									<label className="form-label">Nazwa turnieju</label>
+									<input
+										className="form-input"
+										value={tournamentName}
+										onChange={e => setTournamentName(e.target.value)}
+										placeholder="Nazwa turnieju"
+									/>
+								</div>
+								<div className="form-group" style={{ flex: 0 }}>
+									<label className="form-label">&nbsp;</label>
+									<button
+										className="btn btn-primary"
+										onClick={saveTournamentName}
+										disabled={saving || tournamentName === tournament.name}
+									>
+										{saving ? "Zapisywanie..." : "Zapisz"}
+									</button>
+								</div>
+							</div>
+							<div className="flex gap-2" style={{ marginTop: 12 }}>
+								<Link to={`/admin/tournament/${tournament.id}`} className="btn btn-secondary btn-sm">
+									⚙️ Ustawienia punktacji
+								</Link>
+								<Link to="/admin/tournaments" className="btn btn-secondary btn-sm">
+									⇄ Zmień turniej
+								</Link>
+								<Link to="/admin/tournament/new" className="btn btn-secondary btn-sm">
+									+ Nowy turniej
+								</Link>
+							</div>
+							{tournament.settings?.scoring && (
+								<div className="info-message" style={{ marginTop: 12 }}>
+									<strong>Tryb:</strong>{" "}
+									{tournament.settings.scoring.mode === "sets"
+										? `Do ${tournament.settings.scoring.setsToWin} setów (po ${tournament.settings.scoring.pointsToWinSet} pkt)`
+										: "Tylko punkty"}
+								</div>
+							)}
+						</>
+					) : (
+						<div className="text-muted">Ładowanie...</div>
+					)}
+				</div>
 
-          <div className="card">
-            <div className="card-header">
-              <h3>Aktualny mecz</h3>
-            </div>
-            {liveMatch ? (
-              <>
-                <div className="live-indicator mb-2">
-                  <span className="live-dot"></span>
-                  <span>NA ŻYWO</span>
-                </div>
-                <div style={{ fontSize: 14, marginBottom: 12 }}>
-                  <span style={{ color: team1?.color || undefined }}>{team1?.name || '—'}</span>
-                  <span className="text-dim"> vs </span>
-                  <span style={{ color: team2?.color || undefined }}>{team2?.name || '—'}</span>
-                </div>
-                <Link to={`/admin/match/${liveMatch.id}`} className="btn btn-primary btn-sm">
-                  Kontroluj mecz
-                </Link>
-              </>
-            ) : (
-              <>
-                <div className="text-muted mb-2">Brak aktywnego meczu</div>
-                {pendingMatches.length > 0 && (
-                  <Link to="/admin/bracket" className="btn btn-secondary btn-sm">
-                    Rozpocznij mecz
-                  </Link>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+				{/* Quick Stats */}
+				<div className="grid grid-3">
+					<div className="card">
+						<div className="card-header">
+							<h3>Drużyny</h3>
+						</div>
+						<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>{teams.length}</div>
+						<Link to="/admin/teams" className="btn btn-secondary btn-sm">
+							{teams.length === 0 ? "Dodaj drużyny" : "Zarządzaj drużynami"}
+						</Link>
+					</div>
 
-        {/* Next Steps Guidance */}
-        {currentStep === 1 && (
-          <div className="info-message">
-            <strong>Następny krok:</strong> Dodaj co najmniej 2 drużyny, aby móc wygenerować drabinkę turniejową.
-            <Link to="/admin/teams" style={{ marginLeft: 12 }}>
-              Przejdź do drużyn →
-            </Link>
-          </div>
-        )}
+					<div className="card">
+						<div className="card-header">
+							<h3>Drabinka</h3>
+						</div>
+						<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>
+							{bracket.length > 0
+								? `${bracket.filter(m => m.status === "completed").length}/${bracket.length}`
+								: "—"}
+						</div>
+						<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
+							{bracket.length === 0 ? "Wygeneruj drabinkę" : "Edytuj drabinkę"}
+						</Link>
+					</div>
 
-        {currentStep === 2 && (
-          <div className="info-message">
-            <strong>Następny krok:</strong> Masz {teams.length} drużyn. Wygeneruj drabinkę turniejową, aby rozpocząć mecze.
-            <Link to="/admin/bracket" style={{ marginLeft: 12 }}>
-              Przejdź do drabinki →
-            </Link>
-          </div>
-        )}
+					<div className="card">
+						<div className="card-header">
+							<h3>Aktualny mecz</h3>
+						</div>
+						{liveMatch ? (
+							<>
+								<div className="live-indicator mb-2">
+									<span className="live-dot"></span>
+									<span>NA ŻYWO</span>
+								</div>
+								<div style={{ fontSize: 14, marginBottom: 12 }}>
+									<span style={{ color: team1?.color || undefined }}>{team1?.name || "—"}</span>
+									<span className="text-dim"> vs </span>
+									<span style={{ color: team2?.color || undefined }}>{team2?.name || "—"}</span>
+								</div>
+								<Link to={`/admin/match/${liveMatch.id}`} className="btn btn-primary btn-sm">
+									Kontroluj mecz
+								</Link>
+							</>
+						) : (
+							<>
+								<div className="text-muted mb-2">Brak aktywnego meczu</div>
+								{pendingMatches.length > 0 && (
+									<Link to="/admin/bracket" className="btn btn-secondary btn-sm">
+										Rozpocznij mecz
+									</Link>
+								)}
+							</>
+						)}
+					</div>
+				</div>
 
-        {currentStep === 3 && pendingMatches.length > 0 && !liveMatch && (
-          <div className="info-message">
-            <strong>Gotowe do gry:</strong> Masz {pendingMatches.length} oczekujących meczów. Rozpocznij pierwszy mecz z drabinki.
-            <Link to="/admin/bracket" style={{ marginLeft: 12 }}>
-              Przejdź do drabinki →
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+				{/* Next Steps Guidance */}
+				{currentStep === 1 && (
+					<div className="info-message">
+						<strong>Następny krok:</strong> Dodaj co najmniej 2 drużyny, aby móc wygenerować drabinkę turniejową.
+						<Link to="/admin/teams" style={{ marginLeft: 12 }}>
+							Przejdź do drużyn →
+						</Link>
+					</div>
+				)}
+
+				{currentStep === 2 && (
+					<div className="info-message">
+						<strong>Następny krok:</strong> Masz {teams.length} drużyn. Wygeneruj drabinkę turniejową, aby
+						rozpocząć mecze.
+						<Link to="/admin/bracket" style={{ marginLeft: 12 }}>
+							Przejdź do drabinki →
+						</Link>
+					</div>
+				)}
+
+				{currentStep === 3 && pendingMatches.length > 0 && !liveMatch && (
+					<div className="info-message">
+						<strong>Gotowe do gry:</strong> Masz {pendingMatches.length} oczekujących meczów. Rozpocznij pierwszy
+						mecz z drabinki.
+						<Link to="/admin/bracket" style={{ marginLeft: 12 }}>
+							Przejdź do drabinki →
+						</Link>
+					</div>
+				)}
+			</div>
+		</div>
+	);
 }

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from "../../stores/tournament.store";
 import { useToast } from "../../components/Toast";
 import { useConfirm } from "../../components/ConfirmModal";
 import "../../styles/admin.css";
 
-type Ack<T> = { ok: true; data: T } | { ok: false; error: string };
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
 
 type TeamDraft = { name: string; shortName: string; color: string };
 type Drafts = Record<string, TeamDraft>;
@@ -27,6 +27,7 @@ export function TeamsManager() {
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const { addToast } = useToast();
 	const confirm = useConfirm();
+	const navigate = useNavigate();
 
 	const [name, setName] = useState("");
 	const [shortName, setShortName] = useState("");
@@ -46,6 +47,10 @@ export function TeamsManager() {
 
 		socket.emit("tournament:default", null, (ack: Ack<Tournament>) => {
 			if (!ack.ok) return;
+			if (!ack.data) {
+				navigate("/admin", { replace: true });
+				return;
+			}
 			setTournament(ack.data);
 		});
 
@@ -74,7 +79,7 @@ export function TeamsManager() {
 		const onPlayerUpdated = (p: Player) => {
 			setPlayers(prev => ({
 				...prev,
-				[p.teamId]: (prev[p.teamId] ?? []).map(x => x.id === p.id ? p : x)
+				[p.teamId]: (prev[p.teamId] ?? []).map(x => (x.id === p.id ? p : x))
 			}));
 		};
 		const onPlayerDeleted = ({ playerId, teamId }: { playerId: string; teamId: string }) => {
@@ -94,7 +99,7 @@ export function TeamsManager() {
 			socket.off("player:updated", onPlayerUpdated);
 			socket.off("player:deleted", onPlayerDeleted);
 		};
-	}, [socket, setTournament, setTeams]);
+	}, [socket, setTournament, setTeams, navigate]);
 
 	const canCreate = useMemo(() => !!socket && !!tournament && name.trim().length > 0, [socket, tournament, name]);
 
@@ -116,7 +121,7 @@ export function TeamsManager() {
 				setName("");
 				setShortName("");
 				setColor(randomColor());
-				addToast(`Drużyna "${ack.data.name}" dodana`, "success");
+				if (ack.data) addToast(`Drużyna "${ack.data.name}" dodana`, "success");
 			}
 		);
 	};
@@ -139,7 +144,7 @@ export function TeamsManager() {
 			title: "Usuń drużynę",
 			message: `Czy na pewno chcesz usunąć drużynę "${teamName}"? Ta operacja jest nieodwracalna i usunie również wszystkich zawodników.`,
 			confirmText: "Usuń drużynę",
-			danger: true,
+			danger: true
 		});
 		if (!confirmed) return;
 		socket.emit("admin:team:delete", { teamId });
@@ -161,14 +166,14 @@ export function TeamsManager() {
 			return;
 		}
 		setExpandedTeamId(teamId);
-		
+
 		// Load players if not already loaded
 		if (!players[teamId] && socket) {
 			setLoadingPlayers(teamId);
 			socket.emit("player:list", { teamId }, (ack: Ack<Player[]>) => {
 				setLoadingPlayers(null);
-				if (ack.ok) {
-					setPlayers(prev => ({ ...prev, [teamId]: ack.data }));
+				if (ack.ok && ack.data) {
+					setPlayers(prev => ({ ...prev, [teamId]: ack.data as Player[] }));
 				}
 			});
 		}
@@ -182,7 +187,7 @@ export function TeamsManager() {
 				return;
 			}
 			setNewPlayerName("");
-			addToast(`Zawodnik "${ack.data.name}" dodany`, "success");
+			if (ack.data) addToast(`Zawodnik "${ack.data.name}" dodany`, "success");
 		});
 	};
 
@@ -378,7 +383,10 @@ export function TeamsManager() {
 													>
 														Edytuj
 													</button>
-													<button className="btn btn-danger btn-sm" onClick={() => remove(t.id, t.name)}>
+													<button
+														className="btn btn-danger btn-sm"
+														onClick={() => remove(t.id, t.name)}
+													>
 														Usuń
 													</button>
 												</div>
@@ -387,17 +395,26 @@ export function TeamsManager() {
 
 										{/* Players section */}
 										{expandedTeamId === t.id && !isEditing && (
-											<div className="players-section" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+											<div
+												className="players-section"
+												style={{
+													marginTop: 12,
+													paddingTop: 12,
+													borderTop: "1px solid var(--border)"
+												}}
+											>
 												<div className="flex items-center justify-between mb-2">
 													<strong style={{ fontSize: 14 }}>Zawodnicy</strong>
 												</div>
-												
+
 												{loadingPlayers === t.id ? (
 													<div className="text-muted">Ładowanie...</div>
 												) : (
 													<>
 														{(players[t.id] ?? []).length === 0 ? (
-															<div className="text-muted mb-2" style={{ fontSize: 13 }}>Brak zawodników w drużynie</div>
+															<div className="text-muted mb-2" style={{ fontSize: 13 }}>
+																Brak zawodników w drużynie
+															</div>
 														) : (
 															<ul className="player-list">
 																{(players[t.id] ?? []).map(p => (
@@ -413,7 +430,7 @@ export function TeamsManager() {
 																))}
 															</ul>
 														)}
-														
+
 														<div className="form-row" style={{ marginTop: 8 }}>
 															<input
 																className="form-input form-input-sm"

@@ -5,7 +5,7 @@ import { useMatchStore, type MatchScore } from '../../stores/match.store'
 import { useTournamentStore, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import '../../styles/admin.css'
 
-type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string }
 
 export function FanView() {
   const { socket, connected, reconnecting, onReconnect } = useSocket()
@@ -16,7 +16,7 @@ export function FanView() {
   const refreshState = useCallback(() => {
     if (!socket) return
     socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setTournament(ack.data)
     })
   }, [socket, setTournament])
@@ -32,7 +32,7 @@ export function FanView() {
     if (!socket) return
 
     socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setTournament(ack.data)
     })
 

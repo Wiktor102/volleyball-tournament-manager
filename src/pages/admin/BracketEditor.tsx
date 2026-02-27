@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useSocket } from '../../socket/context'
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from '../../stores/tournament.store'
 import { useToast } from '../../components/Toast'
 import { useConfirm } from '../../components/ConfirmModal'
 import '../../styles/admin.css'
 
-type Ack<T> = { ok: true; data: T } | { ok: false; error: string }
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string }
 
 type BracketMatch = {
   id: string
@@ -31,12 +31,14 @@ export function BracketEditor() {
   const [error, setError] = useState<string | null>(null)
   const { addToast } = useToast()
   const confirm = useConfirm()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!socket) return
 
     socket.emit('tournament:default', null, (ack: Ack<Tournament>) => {
       if (!ack.ok) return
+      if (!ack.data) { navigate('/admin', { replace: true }); return }
       setTournament(ack.data)
     })
 
@@ -54,12 +56,12 @@ export function BracketEditor() {
       socket.off('tournament:state', onState)
       socket.off('bracket:updated', onBracket)
     }
-  }, [socket, setTournament, setTeams])
+  }, [socket, setTournament, setTeams, navigate])
 
   const load = () => {
     if (!socket || !tournament) return
     socket.emit('bracket:list', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
-      if (!ack.ok) return
+      if (!ack.ok || !ack.data) return
       setBracket(ack.data)
     })
   }
@@ -99,7 +101,7 @@ export function BracketEditor() {
         addToast(ack.error, 'error')
         return
       }
-      setBracket(ack.data)
+      if (ack.data) setBracket(ack.data)
       addToast('Drabinka wygenerowana pomyślnie', 'success')
     })
   }
@@ -120,7 +122,7 @@ export function BracketEditor() {
         addToast(ack.error, 'error')
         return
       }
-      setBracket(ack.data)
+      if (ack.data) setBracket(ack.data)
       addToast('Drabinka wyczyszczona', 'info')
     })
   }
@@ -137,7 +139,7 @@ export function BracketEditor() {
           addToast(ack.error, 'error')
           return
         }
-        setBracket(ack.data)
+        if (ack.data) setBracket(ack.data)
       },
     )
   }
