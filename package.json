@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,client -c yellow,cyan \"tsx watch server/index.ts\" \"vite\"",
+    "dev": "concurrently -n server,client -c yellow,cyan \"tsx watch server/index.ts\" \"vite --host\"",
     "dev:server": "tsx watch server/index.ts",
-    "dev:client": "vite",
+    "dev:client": "vite --host",
     "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
     "start": "tsx server/index.ts",
     "lint": "eslint .",

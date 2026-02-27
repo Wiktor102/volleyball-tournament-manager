@@ -32,6 +32,7 @@ if (fs.existsSync(distDir)) {
 	});
 }
 
-httpServer.listen(config.port, () => {
-	console.log(`Server listening on http://localhost:${config.port}`);
+httpServer.listen(config.port, config.host, () => {
+	const localHost = config.host === "0.0.0.0" ? "localhost" : config.host;
+	console.log(`Server listening on http://${localHost}:${config.port}`);
 });
