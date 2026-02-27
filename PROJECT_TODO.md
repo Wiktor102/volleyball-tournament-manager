@@ -124,22 +124,22 @@
   - [x] Basic tournament info (name, status)
   - [x] Scoring mode configuration
   - [x] Team import (CSV/JSON)
-  - [ ] Bracket generation/import
+  - [x] Bracket generation/import (auto + manual modes)
   - [x] Player management per team
 - [x] Dropping shortName (team shortcuts) across the system
-- [ ] Set management improvements:
-  - [ ] Manual set score input
-  - [ ] Set duration tracking
-  - [ ] Highlight current set
-- [ ] Undo/redo for admin actions
+- [x] Set management improvements:
+  - [x] Manual set score input (direct score setting + inline set editing)
+  - [x] Set duration tracking (timestamps per set, live elapsed timer)
+  - [x] Highlight current set
+- [ ] Undo/redo for admin actions (SKIPPED - existing reset/undo-set controls sufficient)
 - [x] Protective confirmations for destructive / non-normal admin actions
   - [x] Confirmation modal for resetting a match
-  - [ ] Confirmation for forcing / manually setting a **match winner**
+  - [x] Confirmation for forcing / manually setting a **match winner**
   - [x] Confirmation for deleting team/tournament
-  - [ ] Confirmation when importing a bracket that will **overwrite** existing assignments
+  - [x] Confirmation when generating a bracket that will **overwrite** existing assignments
   - [x] Confirmation for clearing bracket
   - [x] UX: typed confirmation for very dangerous actions (tournament delete)
-  - [ ] Add admin preference to opt-out of confirmations (conservative default = enabled)
+  - [x] Add admin preference to opt-out of confirmations (conservative default = enabled)
 
 #### 3. Display Views
 - [ ] Fan View enhancements:
@@ -238,3 +238,18 @@ Completed:
 15. ✅ Per-round scoring overrides (e.g., final uses timed mode while other rounds use sets)
 16. ✅ CSV team import (with player roster support)
 17. ✅ Dropped team short names and shortcuts across the system (simplified UI)
+
+## Session Work (Feb 27, 2026)
+
+Completed:
+1. ✅ Manual set score input (direct score setting via toggle + inline set history editing)
+2. ✅ Set duration tracking (per-set timestamps, live elapsed timer, backward-compatible JSON format)
+3. ✅ Current set highlighting in match control
+4. ✅ Confirmation for forcing/manually setting match winner
+5. ✅ Confirmation when generating bracket that overwrites existing
+6. ✅ Admin preference to opt-out of confirmations (localStorage, skips non-critical only)
+8. ✅ Manual bracket setup (auto/manual generation modes, duplicate prevention in team assignment)
+
+Skipped:
+- Undo/redo for admin actions (existing reset/undo-set controls are sufficient)
+- Bracket import from file (skipped per user request)

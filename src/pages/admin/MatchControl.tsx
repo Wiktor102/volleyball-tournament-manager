@@ -10,6 +10,7 @@ import {
 } from "../../stores/tournament.store";
 import type { MatchScore } from "../../stores/match.store";
 import { useToast } from "../../components/Toast";
+import { useConfirm } from "../../components/ConfirmModal";
 import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
@@ -35,11 +36,22 @@ export function MatchControl() {
 	const { socket, connected } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const { addToast } = useToast();
+	const confirm = useConfirm();
 	const navigate = useNavigate();
 
 	const [match, setMatch] = useState<BracketMatch | null>(null);
 	const [score, setScore] = useState<MatchScore | null>(null);
 	const [error, setError] = useState<string | null>(null);
+
+	// Manual score editing state
+	const [editingScore, setEditingScore] = useState(false);
+	const [manualT1, setManualT1] = useState(0);
+	const [manualT2, setManualT2] = useState(0);
+
+	// Set score editing state
+	const [editingSetIndex, setEditingSetIndex] = useState<number | null>(null);
+	const [editSetT1, setEditSetT1] = useState(0);
+	const [editSetT2, setEditSetT2] = useState(0);
 
 	// Timer state for timed mode
 	const [timerRunning, setTimerRunning] = useState(false);
@@ -104,6 +116,15 @@ export function MatchControl() {
 		const mins = Math.floor(seconds / 60);
 		const secs = seconds % 60;
 		return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+	};
+
+	const formatSetDuration = (startedAt?: number | null, endedAt?: number | null) => {
+		if (!startedAt || !endedAt) return null;
+		const durationMs = endedAt - startedAt;
+		if (durationMs < 0) return null;
+		const mins = Math.floor(durationMs / 60000);
+		const secs = Math.floor((durationMs % 60000) / 1000);
+		return `${mins}:${secs.toString().padStart(2, "0")}`;
 	};
 
 	const timeRemaining = Math.max(0, matchDurationSeconds - localTime);
@@ -255,11 +276,82 @@ export function MatchControl() {
 		addToast("Cofnięto ostatni set", "info");
 	};
 
+	// Manual score input
+	const startEditingScore = () => {
+		setManualT1(score?.team1CurrentPoints ?? 0);
+		setManualT2(score?.team2CurrentPoints ?? 0);
+		setEditingScore(true);
+	};
+
+	const saveManualScore = () => {
+		if (!socket || !matchId) return;
+		socket.emit("admin:score:setDirect", { matchId, team1Points: manualT1, team2Points: manualT2 });
+		setEditingScore(false);
+		addToast("Wynik ustawiony ręcznie", "success");
+	};
+
+	const cancelEditingScore = () => {
+		setEditingScore(false);
+	};
+
+	// Set score editing
+	const startEditingSet = (index: number) => {
+		if (!score?.setScores?.[index]) return;
+		setEditSetT1(score.setScores[index].t1);
+		setEditSetT2(score.setScores[index].t2);
+		setEditingSetIndex(index);
+	};
+
+	const saveSetEdit = () => {
+		if (!socket || !matchId || editingSetIndex === null) return;
+		socket.emit("admin:set:edit", { matchId, setIndex: editingSetIndex, t1: editSetT1, t2: editSetT2 });
+		setEditingSetIndex(null);
+		addToast("Wynik seta zaktualizowany", "success");
+	};
+
+	const cancelSetEdit = () => {
+		setEditingSetIndex(null);
+	};
+
+	// Force winner with confirmation
+	const forceWinner = async (winnerId: string, winnerName: string) => {
+		if (!socket || !tournament || !matchId) return;
+		const confirmed = await confirm({
+			title: "Wymuś zwycięzcę",
+			message: `Czy na pewno chcesz ręcznie ustawić ${winnerName} jako zwycięzcę tego meczu? Mecz zostanie zakończony z aktualnym wynikiem.`,
+			confirmText: "Tak, zakończ mecz",
+			danger: true,
+		});
+		if (!confirmed) return;
+		syncTimer();
+		end(winnerId);
+	};
+
+	// Current set elapsed time (live counter)
+	const [currentSetElapsed, setCurrentSetElapsed] = useState("");
+
 	const t1 = teams.find(t => t.id === match?.team1Id);
 	const t2 = teams.find(t => t.id === match?.team2Id);
 
 	const canStart = match?.status === "pending" && !!match.team1Id && !!match.team2Id;
 	const canScore = match?.status === "live";
+
+	useEffect(() => {
+		const startedAt = score?.currentSetStartedAt;
+		if (!startedAt || !canScore) {
+			setCurrentSetElapsed("");
+			return;
+		}
+		const tick = () => {
+			const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+			const mins = Math.floor(elapsed / 60);
+			const secs = elapsed % 60;
+			setCurrentSetElapsed(`${mins}:${secs.toString().padStart(2, "0")}`);
+		};
+		tick();
+		const interval = setInterval(tick, 1000);
+		return () => clearInterval(interval);
+	}, [score?.currentSetStartedAt, canScore]);
 
 	useEffect(() => {
 		if (!canScore) return;
@@ -417,66 +509,166 @@ export function MatchControl() {
 									{score?.setScores && score.setScores.length > 0 && (
 										<div className="set-history">
 											{score.setScores.map((s, i) => (
-												<span key={i} className="set-result">
-													Set {i + 1}: {s.t1}-{s.t2}
-												</span>
+												editingSetIndex === i ? (
+													<div key={i} className="set-result set-result--editing">
+														<span className="text-muted" style={{ fontSize: 12 }}>Set {i + 1}:</span>
+														<input
+															type="number"
+															className="form-input form-input-sm set-edit-input"
+															value={editSetT1}
+															onChange={e => setEditSetT1(Math.max(0, Number(e.target.value)))}
+															min={0}
+															style={{ width: 52 }}
+															autoFocus
+														/>
+														<span>-</span>
+														<input
+															type="number"
+															className="form-input form-input-sm set-edit-input"
+															value={editSetT2}
+															onChange={e => setEditSetT2(Math.max(0, Number(e.target.value)))}
+															min={0}
+															style={{ width: 52 }}
+														/>
+														<button className="btn btn-success btn-xs" onClick={saveSetEdit}>OK</button>
+														<button className="btn btn-secondary btn-xs" onClick={cancelSetEdit}>Anuluj</button>
+													</div>
+												) : (
+													<span
+														key={i}
+														className={`set-result set-result--clickable`}
+														onClick={() => canScore && startEditingSet(i)}
+														title={canScore ? "Kliknij, aby edytować wynik seta" : undefined}
+													>
+														Set {i + 1}: {s.t1}-{s.t2}
+														{formatSetDuration(s.startedAt, s.endedAt) && (
+															<span className="text-dim" style={{ marginLeft: 6, fontSize: 11 }}>
+																({formatSetDuration(s.startedAt, s.endedAt)})
+															</span>
+														)}
+													</span>
+												)
 											))}
+										</div>
+									)}
+									{/* Current set indicator */}
+									{canScore && (
+										<div className="current-set-indicator">
+											Aktualny set: <strong>{score?.currentSet ?? 1}</strong>
+											{currentSetElapsed && (
+												<span className="text-dim" style={{ marginLeft: 8 }}>
+													(czas: {currentSetElapsed})
+												</span>
+											)}
 										</div>
 									)}
 								</div>
 							)}
 
-							<div className="score-display">
-								<div className="score-team left">
-									<div className="score-team-name" style={{ color: t1?.color || undefined }}>
-										{teamLabel(t1)}
+							{editingScore ? (
+								<div className="score-display">
+									<div className="score-team left">
+										<div className="score-team-name" style={{ color: t1?.color || undefined }}>
+											{teamLabel(t1)}
+										</div>
+										<input
+											type="number"
+											className="form-input score-manual-input"
+											value={manualT1}
+											onChange={e => setManualT1(Math.max(0, Number(e.target.value)))}
+											min={0}
+											autoFocus
+										/>
 									</div>
-									<div className="score-value">{score?.team1CurrentPoints ?? 0}</div>
-									<div className="score-controls">
-										<button
-											className="btn btn-secondary btn-lg"
-											disabled={!canScore}
-											onClick={() => dec("team1")}
-										>
-											−
-										</button>
-										<button
-											className="btn btn-primary btn-lg"
-											disabled={!canScore}
-											onClick={() => inc("team1")}
-										>
-											+
-										</button>
-									</div>
-									<div className="keyboard-hint mt-2">A (+) / Q (-)</div>
-								</div>
 
-								<div className="score-vs">vs</div>
+									<div className="score-vs">vs</div>
 
-								<div className="score-team right">
-									<div className="score-team-name" style={{ color: t2?.color || undefined }}>
-										{teamLabel(t2)}
+									<div className="score-team right">
+										<div className="score-team-name" style={{ color: t2?.color || undefined }}>
+											{teamLabel(t2)}
+										</div>
+										<input
+											type="number"
+											className="form-input score-manual-input"
+											value={manualT2}
+											onChange={e => setManualT2(Math.max(0, Number(e.target.value)))}
+											min={0}
+										/>
 									</div>
-									<div className="score-value">{score?.team2CurrentPoints ?? 0}</div>
-									<div className="score-controls">
-										<button
-											className="btn btn-secondary btn-lg"
-											disabled={!canScore}
-											onClick={() => dec("team2")}
-										>
-											−
-										</button>
-										<button
-											className="btn btn-primary btn-lg"
-											disabled={!canScore}
-											onClick={() => inc("team2")}
-										>
-											+
-										</button>
-									</div>
-									<div className="keyboard-hint mt-2">L (+) / P (-)</div>
 								</div>
-							</div>
+							) : (
+								<div className="score-display">
+									<div className="score-team left">
+										<div className="score-team-name" style={{ color: t1?.color || undefined }}>
+											{teamLabel(t1)}
+										</div>
+										<div className="score-value">{score?.team1CurrentPoints ?? 0}</div>
+										<div className="score-controls">
+											<button
+												className="btn btn-secondary btn-lg"
+												disabled={!canScore}
+												onClick={() => dec("team1")}
+											>
+												−
+											</button>
+											<button
+												className="btn btn-primary btn-lg"
+												disabled={!canScore}
+												onClick={() => inc("team1")}
+											>
+												+
+											</button>
+										</div>
+										<div className="keyboard-hint mt-2">A (+) / Q (-)</div>
+									</div>
+
+									<div className="score-vs">vs</div>
+
+									<div className="score-team right">
+										<div className="score-team-name" style={{ color: t2?.color || undefined }}>
+											{teamLabel(t2)}
+										</div>
+										<div className="score-value">{score?.team2CurrentPoints ?? 0}</div>
+										<div className="score-controls">
+											<button
+												className="btn btn-secondary btn-lg"
+												disabled={!canScore}
+												onClick={() => dec("team2")}
+											>
+												−
+											</button>
+											<button
+												className="btn btn-primary btn-lg"
+												disabled={!canScore}
+												onClick={() => inc("team2")}
+											>
+												+
+											</button>
+										</div>
+										<div className="keyboard-hint mt-2">L (+) / P (-)</div>
+									</div>
+								</div>
+							)}
+
+							{/* Manual score edit toggle */}
+							{canScore && (
+								<div style={{ textAlign: "center", marginTop: 12 }}>
+									{editingScore ? (
+										<div className="btn-group" style={{ justifyContent: "center" }}>
+											<button className="btn btn-success btn-sm" onClick={saveManualScore}>
+												Zapisz wynik
+											</button>
+											<button className="btn btn-secondary btn-sm" onClick={cancelEditingScore}>
+												Anuluj
+											</button>
+										</div>
+									) : (
+										<button className="btn btn-secondary btn-sm" onClick={startEditingScore}>
+											Ustaw wynik ręcznie
+										</button>
+									)}
+								</div>
+							)}
 
 							{/* Set Controls - only for sets mode */}
 							{canScore && scoringMode === "sets" && (
@@ -518,22 +710,16 @@ export function MatchControl() {
 								<button
 									className="btn btn-primary btn-lg"
 									disabled={match.status !== "live" || !match.team1Id}
-									onClick={() => {
-										syncTimer();
-										end(match.team1Id!);
-									}}
+									onClick={() => forceWinner(match.team1Id!, t1?.name || "Drużyna 1")}
 								>
-									🏆 Wygrywa {t1?.name || "Drużyna 1"}
+									Wygrywa {t1?.name || "Drużyna 1"}
 								</button>
 								<button
 									className="btn btn-primary btn-lg"
 									disabled={match.status !== "live" || !match.team2Id}
-									onClick={() => {
-										syncTimer();
-										end(match.team2Id!);
-									}}
+									onClick={() => forceWinner(match.team2Id!, t2?.name || "Drużyna 2")}
 								>
-									🏆 Wygrywa {t2?.name || "Drużyna 2"}
+									Wygrywa {t2?.name || "Drużyna 2"}
 								</button>
 
 								<button

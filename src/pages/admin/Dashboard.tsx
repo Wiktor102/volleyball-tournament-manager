@@ -4,6 +4,7 @@ import { useSocket } from "../../socket/context";
 import { useMatchStore, type MatchScore } from "../../stores/match.store";
 import { useTournamentStore, type Tournament, type TournamentState } from "../../stores/tournament.store";
 import { useToast } from "../../components/Toast";
+import { getAdminPreferences, setAdminPreferences } from "../../components/ConfirmModal";
 import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
@@ -31,6 +32,7 @@ export function Dashboard() {
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 	const [saving, setSaving] = useState(false);
 	const [loaded, setLoaded] = useState(false);
+	const [skipConfirmations, setSkipConfirmations] = useState(() => getAdminPreferences().skipConfirmations);
 
 	// Function to refresh all state from server
 	const refreshState = useCallback(() => {
@@ -344,6 +346,29 @@ export function Dashboard() {
 						</Link>
 					</div>
 				)}
+
+				{/* Admin Preferences */}
+				<div className="card" style={{ marginTop: 8 }}>
+					<div className="card-header">
+						<h3>Preferencje admina</h3>
+					</div>
+					<label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14 }}>
+						<input
+							type="checkbox"
+							checked={skipConfirmations}
+							onChange={e => {
+								const val = e.target.checked;
+								setSkipConfirmations(val);
+								setAdminPreferences({ skipConfirmations: val });
+								addToast(
+									val ? "Potwierdzenia wyłączone (oprócz krytycznych)" : "Potwierdzenia włączone",
+									"info"
+								);
+							}}
+						/>
+						Pomiń okna potwierdzenia (oprócz krytycznych, np. usuwanie)
+					</label>
+				</div>
 			</div>
 		</div>
 	);

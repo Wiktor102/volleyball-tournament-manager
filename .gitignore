@@ -6,4 +6,3 @@ dist
 data/*.db*
 *.tsbuildinfo
 .playwright-cli
-

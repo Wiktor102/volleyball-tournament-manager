@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getTournamentState } from '../../services/state.service'
 import { assignTeamToSlot, clearBracket, generateBracket, listBracketMatches, recomputeBracket } from '../../services/bracket.service'
 
-const GenerateSchema = z.object({ tournamentId: z.string().min(1) })
+const GenerateSchema = z.object({ tournamentId: z.string().min(1), mode: z.enum(['auto', 'manual']).default('auto') })
 const AssignSchema = z.object({
   tournamentId: z.string().min(1),
   matchId: z.string().min(1),
@@ -24,7 +24,7 @@ export function registerBracketHandlers(io: Server, socket: Socket) {
     const parsed = GenerateSchema.safeParse(payload)
     if (!parsed.success) return ack?.({ ok: false, error: 'Nieprawidłowe dane' })
 
-    const res = await generateBracket(parsed.data.tournamentId)
+    const res = await generateBracket(parsed.data.tournamentId, parsed.data.mode)
     if (!res.ok) return ack?.({ ok: false, error: res.error })
 
     const items = await listBracketMatches(parsed.data.tournamentId)

@@ -87,22 +87,83 @@ export function BracketEditor() {
     return { rounds: roundsList, thirdPlaceMatch: thirdPlace }
   }, [bracket])
 
+  // Compute which teams are already assigned in round 1 (for duplicate prevention)
+  const assignedTeamIds = useMemo(() => {
+    const round1 = rounds.find(r => r.round === 1)
+    if (!round1) return new Set<string>()
+    const ids = new Set<string>()
+    for (const m of round1.matches) {
+      if (m.team1Id) ids.add(m.team1Id)
+      if (m.team2Id) ids.add(m.team2Id)
+    }
+    return ids
+  }, [rounds])
+
+  // Get available teams for a given dropdown slot (exclude already-assigned, but include the current value)
+  const getAvailableTeams = (currentTeamId: string | null) => {
+    return teams.filter(t => t.id === currentTeamId || !assignedTeamIds.has(t.id))
+  }
+
+  // Count how many round-1 slots are still unassigned
+  const unassignedSlotCount = useMemo(() => {
+    const round1 = rounds.find(r => r.round === 1)
+    if (!round1) return 0
+    let count = 0
+    for (const m of round1.matches) {
+      if (!m.team1Id) count++
+      if (!m.team2Id) count++
+    }
+    return count
+  }, [rounds])
+
   const teamLabel = (t: Team | undefined) => {
     if (!t) return '—'
     return t.name
   }
 
-  const gen = () => {
+  const gen = async (mode: 'auto' | 'manual') => {
     if (!socket || !tournament) return
     setError(null)
-    socket.emit('admin:bracket:generate', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
+
+    // Check if bracket already exists - confirm before overwriting
+    if (bracket.length > 0) {
+      const hasLiveOrCompleted = bracket.some(m => m.status === 'live' || m.status === 'completed')
+      const message = hasLiveOrCompleted
+        ? 'Istnieje już drabinka z meczami w toku lub zakończonymi. Wygenerowanie nowej drabinki usunie wszystkie dotychczasowe wyniki. Czy na pewno chcesz kontynuować?'
+        : 'Istnieje już drabinka. Wygenerowanie nowej zastąpi obecną. Czy na pewno chcesz kontynuować?'
+      const confirmed = await confirm({
+        title: 'Nadpisz drabinkę',
+        message,
+        confirmText: 'Generuj nową',
+        danger: hasLiveOrCompleted,
+      })
+      if (!confirmed) return
+
+      // Clear existing bracket first, then generate new one
+      await new Promise<void>((resolve, reject) => {
+        socket.emit('admin:bracket:clear', { tournamentId: tournament.id }, (ack: Ack<BracketMatch[]>) => {
+          if (!ack.ok) {
+            setError(ack.error)
+            addToast(ack.error, 'error')
+            reject(new Error(ack.error))
+          } else {
+            resolve()
+          }
+        })
+      })
+    }
+
+    socket.emit('admin:bracket:generate', { tournamentId: tournament.id, mode }, (ack: Ack<BracketMatch[]>) => {
       if (!ack.ok) {
         setError(ack.error)
         addToast(ack.error, 'error')
         return
       }
       if (ack.data) setBracket(ack.data)
-      addToast('Drabinka wygenerowana pomyślnie', 'success')
+      addToast(
+        mode === 'auto' ? 'Drabinka wygenerowana automatycznie' : 'Drabinka wygenerowana — przypisz drużyny ręcznie',
+        'success',
+      )
     })
   }
 
@@ -113,6 +174,7 @@ export function BracketEditor() {
       message: 'Czy na pewno chcesz wyczyścić całą drabinkę? Ta operacja jest nieodwracalna i usunie wszystkie mecze i wyniki.',
       confirmText: 'Wyczyść',
       danger: true,
+      skippable: false,
     })
     if (!confirmed) return
     setError(null)
@@ -229,8 +291,11 @@ export function BracketEditor() {
           <div className="card-header">
             <h2>Akcje</h2>
             <div className="btn-group">
-              <button className="btn btn-primary" onClick={gen} disabled={!tournament || teams.length < 2}>
-                Generuj drabinkę
+              <button className="btn btn-primary" onClick={() => gen('auto')} disabled={!tournament || teams.length < 2}>
+                Generuj automatycznie
+              </button>
+              <button className="btn btn-secondary" onClick={() => gen('manual')} disabled={!tournament || teams.length < 2}>
+                Generuj ręcznie
               </button>
               <button className="btn btn-danger" onClick={clear} disabled={!tournament || bracket.length === 0}>
                 Wyczyść drabinkę
@@ -248,6 +313,16 @@ export function BracketEditor() {
             </div>
           )}
         </div>
+
+        {/* Manual assignment info */}
+        {bracket.length > 0 && unassignedSlotCount > 0 && (
+          <div className="card">
+            <div className="info-message">
+              Przypisz drużyny do {unassignedSlotCount} wolnych miejsc w 1. rundzie. Każda drużyna może wystąpić tylko raz.
+              Pozostałe rundy wypełnią się automatycznie na podstawie zwycięzców.
+            </div>
+          </div>
+        )}
 
         {/* Bracket */}
         {rounds.length === 0 ? (
@@ -286,7 +361,7 @@ export function BracketEditor() {
                               onChange={(e) => assign(m.id, 'team1', e.target.value ? e.target.value : null)}
                             >
                               <option value="">— Wybierz drużynę —</option>
-                              {teams.map((t) => (
+                              {getAvailableTeams(m.team1Id).map((t) => (
                                 <option key={t.id} value={t.id}>
                                   {teamLabel(t)}
                                 </option>
@@ -306,7 +381,7 @@ export function BracketEditor() {
                               onChange={(e) => assign(m.id, 'team2', e.target.value ? e.target.value : null)}
                             >
                               <option value="">— Wybierz drużynę —</option>
-                              {teams.map((t) => (
+                              {getAvailableTeams(m.team2Id).map((t) => (
                                 <option key={t.id} value={t.id}>
                                   {teamLabel(t)}
                                 </option>

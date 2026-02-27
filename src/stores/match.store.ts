@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import type { ScoringSettings } from './tournament.store'
 
+export type SetScore = {
+  t1: number
+  t2: number
+  startedAt?: number | null
+  endedAt?: number | null
+}
+
 export type MatchScore = {
   matchId: string
   team1Sets: number
@@ -9,7 +16,8 @@ export type MatchScore = {
   team2CurrentPoints: number
   currentSet: number
   setsToWin: number
-  setScores: Array<{ t1: number; t2: number }>
+  setScores: SetScore[]
+  currentSetStartedAt?: number | null
   scoringMode?: ScoringSettings
   matchTimeSeconds?: number
 }

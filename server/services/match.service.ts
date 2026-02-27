@@ -24,6 +24,13 @@ export type Match = {
 	nextMatchId: string | null;
 };
 
+export type SetScore = {
+	t1: number;
+	t2: number;
+	startedAt?: number | null;
+	endedAt?: number | null;
+};
+
 export type MatchScore = {
 	matchId: string;
 	team1Sets: number;
@@ -32,7 +39,8 @@ export type MatchScore = {
 	team2CurrentPoints: number;
 	currentSet: number;
 	setsToWin: number;
-	setScores: Array<{ t1: number; t2: number }>;
+	setScores: SetScore[];
+	currentSetStartedAt: number | null;
 	scoringMode: ScoringSettings | null;
 	matchTimeSeconds: number;
 };
@@ -53,7 +61,30 @@ function rowToMatch(row: MatchRow): Match {
 	};
 }
 
+function parseSetScoresJson(json: string | null): { sets: SetScore[]; currentSetStartedAt: number | null } {
+	if (!json) return { sets: [], currentSetStartedAt: null };
+	try {
+		const parsed = JSON.parse(json);
+		// New format: { sets: [...], currentSetStartedAt: number | null }
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "sets" in parsed) {
+			return { sets: parsed.sets ?? [], currentSetStartedAt: parsed.currentSetStartedAt ?? null };
+		}
+		// Legacy format: [{t1, t2}, ...]
+		if (Array.isArray(parsed)) {
+			return { sets: parsed, currentSetStartedAt: null };
+		}
+		return { sets: [], currentSetStartedAt: null };
+	} catch {
+		return { sets: [], currentSetStartedAt: null };
+	}
+}
+
+function serializeSetScoresJson(sets: SetScore[], currentSetStartedAt: number | null): string {
+	return JSON.stringify({ sets, currentSetStartedAt });
+}
+
 function rowToScore(row: ScoreRow): MatchScore {
+	const { sets, currentSetStartedAt } = parseSetScoresJson(row.setScoresJson);
 	return {
 		matchId: row.matchId,
 		team1Sets: row.team1Sets,
@@ -62,7 +93,8 @@ function rowToScore(row: ScoreRow): MatchScore {
 		team2CurrentPoints: row.team2CurrentPoints,
 		currentSet: row.currentSet,
 		setsToWin: row.setsToWin,
-		setScores: JSON.parse(row.setScoresJson ?? "[]"),
+		setScores: sets,
+		currentSetStartedAt,
 		scoringMode: JSON.parse(row.scoringModeJson ?? "{}"),
 		matchTimeSeconds: row.matchTimeSeconds ?? 0
 	};
@@ -134,7 +166,7 @@ export async function resetMatchScore(
 			team2Sets: 0,
 			currentSet: 1,
 			setsToWin,
-			setScoresJson: "[]",
+			setScoresJson: serializeSetScoresJson([], opts?.startedAt ?? null),
 			team1CurrentPoints: 0,
 			team2CurrentPoints: 0,
 			matchTimeSeconds: 0,
@@ -332,6 +364,7 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 	let t2Sets = score.team2Sets;
 	let currentSet = score.currentSet;
 	const setScores = [...score.setScores];
+	let currentSetStartedAt = score.currentSetStartedAt;
 
 	// Check if this point wins the set
 	const scoringTeamPoints = team === "team1" ? t1Points : t2Points;
@@ -339,17 +372,24 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 	const isSetWon = scoringTeamPoints >= pointsToWin && scoringTeamPoints - otherTeamPoints >= minAdvantage;
 
 	if (isSetWon) {
-		// Record set score
-		setScores.push({ t1: t1Points, t2: t2Points });
+		const now = Date.now();
+		// Record set score with duration timestamps
+		setScores.push({
+			t1: t1Points,
+			t2: t2Points,
+			startedAt: currentSetStartedAt,
+			endedAt: now,
+		});
 
 		// Award set
 		if (team === "team1") t1Sets++;
 		else t2Sets++;
 
-		// Reset points for next set
+		// Reset points for next set, new set starts now
 		t1Points = 0;
 		t2Points = 0;
 		currentSet++;
+		currentSetStartedAt = now;
 	}
 
 	await db
@@ -360,7 +400,7 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 			team1Sets: t1Sets,
 			team2Sets: t2Sets,
 			currentSet,
-			setScoresJson: JSON.stringify(setScores),
+			setScoresJson: serializeSetScoresJson(setScores, currentSetStartedAt),
 			updatedAt: Date.now()
 		})
 		.where(eq(matchScores.matchId, matchId));
@@ -386,10 +426,16 @@ export async function decrementPoint(matchId: string, team: "team1" | "team2") {
 // Manually award a set (for corrections or simple scoring)
 export async function awardSet(matchId: string, team: "team1" | "team2") {
 	const score = await ensureMatchScore(matchId);
+	const now = Date.now();
 
 	const t1Points = score.team1CurrentPoints;
 	const t2Points = score.team2CurrentPoints;
-	const setScores = [...score.setScores, { t1: t1Points, t2: t2Points }];
+	const setScores = [...score.setScores, {
+		t1: t1Points,
+		t2: t2Points,
+		startedAt: score.currentSetStartedAt,
+		endedAt: now,
+	}];
 
 	await db
 		.update(matchScores)
@@ -399,8 +445,8 @@ export async function awardSet(matchId: string, team: "team1" | "team2") {
 			team1CurrentPoints: 0,
 			team2CurrentPoints: 0,
 			currentSet: score.currentSet + 1,
-			setScoresJson: JSON.stringify(setScores),
-			updatedAt: Date.now()
+			setScoresJson: serializeSetScoresJson(setScores, now),
+			updatedAt: now
 		})
 		.where(eq(matchScores.matchId, matchId));
 
@@ -419,6 +465,9 @@ export async function undoSet(matchId: string) {
 	// Determine which team won the last set
 	const t1WonLast = lastSet.t1 > lastSet.t2;
 
+	// Restore currentSetStartedAt to the undone set's startedAt
+	const restoredStartedAt = lastSet.startedAt ?? null;
+
 	await db
 		.update(matchScores)
 		.set({
@@ -427,7 +476,56 @@ export async function undoSet(matchId: string) {
 			team1CurrentPoints: lastSet.t1,
 			team2CurrentPoints: lastSet.t2,
 			currentSet: Math.max(1, score.currentSet - 1),
-			setScoresJson: JSON.stringify(setScores),
+			setScoresJson: serializeSetScoresJson(setScores, restoredStartedAt),
+			updatedAt: Date.now()
+		})
+		.where(eq(matchScores.matchId, matchId));
+
+	return await getMatchScore(matchId);
+}
+
+// Set current points directly (for manual corrections)
+export async function setPointsDirect(matchId: string, team1Points: number, team2Points: number) {
+	await ensureMatchScore(matchId);
+
+	await db
+		.update(matchScores)
+		.set({
+			team1CurrentPoints: team1Points,
+			team2CurrentPoints: team2Points,
+			updatedAt: Date.now()
+		})
+		.where(eq(matchScores.matchId, matchId));
+
+	return await getMatchScore(matchId);
+}
+
+// Edit a specific completed set score (for corrections)
+export async function editSetScore(matchId: string, setIndex: number, t1: number, t2: number) {
+	const score = await ensureMatchScore(matchId);
+
+	if (setIndex < 0 || setIndex >= score.setScores.length) {
+		return score; // Invalid index, no change
+	}
+
+	const setScores = [...score.setScores];
+	// Preserve existing timestamps when editing score
+	setScores[setIndex] = { ...setScores[setIndex], t1, t2 };
+
+	// Recalculate set counts based on all set scores
+	let team1Sets = 0;
+	let team2Sets = 0;
+	for (const s of setScores) {
+		if (s.t1 > s.t2) team1Sets++;
+		else if (s.t2 > s.t1) team2Sets++;
+	}
+
+	await db
+		.update(matchScores)
+		.set({
+			team1Sets,
+			team2Sets,
+			setScoresJson: serializeSetScoresJson(setScores, score.currentSetStartedAt),
 			updatedAt: Date.now()
 		})
 		.where(eq(matchScores.matchId, matchId));

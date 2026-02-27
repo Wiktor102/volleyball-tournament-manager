@@ -146,7 +146,8 @@ export function TeamsManager() {
 			title: "Usuń drużynę",
 			message: `Czy na pewno chcesz usunąć drużynę "${teamName}"? Ta operacja jest nieodwracalna i usunie również wszystkich zawodników.`,
 			confirmText: "Usuń drużynę",
-			danger: true
+			danger: true,
+			skippable: false,
 		});
 		if (!confirmed) return;
 		socket.emit("admin:team:delete", { teamId });

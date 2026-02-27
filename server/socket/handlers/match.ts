@@ -5,7 +5,9 @@ import {
 	MatchStartSchema,
 	ScoreDecrementSchema,
 	ScoreIncrementSchema,
+	ScoreSetDirectSchema,
 	SetAwardSchema,
+	SetScoreEditSchema,
 	SetUndoSchema,
 	TimerUpdateSchema
 } from "../../utils/validation";
@@ -13,10 +15,12 @@ import { getTournamentState } from "../../services/state.service";
 import {
 	awardSet,
 	decrementPoint,
+	editSetScore,
 	endMatch,
 	ensureMatchScore,
 	incrementPoint,
 	resetMatch,
+	setPointsDirect,
 	startMatch,
 	undoSet,
 	updateMatchTime
@@ -74,6 +78,24 @@ export function registerMatchHandlers(io: Server, socket: Socket) {
 		if (!parsed.success) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
 
 		const score = await updateMatchTime(parsed.data.matchId, parsed.data.timeSeconds);
+		io.to(`match:${parsed.data.matchId}`).emit("match:score", score);
+		return ack?.({ ok: true, data: score });
+	});
+
+	socket.on("admin:score:setDirect", async (payload, ack) => {
+		const parsed = ScoreSetDirectSchema.safeParse(payload);
+		if (!parsed.success) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
+
+		const score = await setPointsDirect(parsed.data.matchId, parsed.data.team1Points, parsed.data.team2Points);
+		io.to(`match:${parsed.data.matchId}`).emit("match:score", score);
+		return ack?.({ ok: true, data: score });
+	});
+
+	socket.on("admin:set:edit", async (payload, ack) => {
+		const parsed = SetScoreEditSchema.safeParse(payload);
+		if (!parsed.success) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
+
+		const score = await editSetScore(parsed.data.matchId, parsed.data.setIndex, parsed.data.t1, parsed.data.t2);
 		io.to(`match:${parsed.data.matchId}`).emit("match:score", score);
 		return ack?.({ ok: true, data: score });
 	});

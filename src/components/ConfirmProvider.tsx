@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { ConfirmContext, type ConfirmOptions } from "./ConfirmModal";
+import { ConfirmContext, getAdminPreferences, type ConfirmOptions } from "./ConfirmModal";
 import "../styles/admin.css";
 
 type ModalState = {
@@ -12,6 +12,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	const [typedText, setTypedText] = useState("");
 
 	const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
+		// Check if this confirmation can be skipped via admin preference
+		const prefs = getAdminPreferences();
+		const isSkippable = options.skippable !== false && !options.requireTypedConfirmation;
+		if (prefs.skipConfirmations && isSkippable) {
+			return Promise.resolve(true);
+		}
+
 		return new Promise(resolve => {
 			setModal({ options, resolve });
 			setTypedText("");

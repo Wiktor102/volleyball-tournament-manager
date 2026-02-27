@@ -44,7 +44,7 @@ function nextPowerOfTwo(n: number) {
   return p
 }
 
-export async function generateBracket(tournamentId: string) {
+export async function generateBracket(tournamentId: string, mode: 'auto' | 'manual' = 'auto') {
   const existing = await listBracketMatches(tournamentId)
   if (existing.length > 0) return { ok: false as const, error: 'Drabinka już istnieje' }
 
@@ -77,7 +77,8 @@ export async function generateBracket(tournamentId: string) {
       let team1Id: string | null = null
       let team2Id: string | null = null
 
-      if (r === 1) {
+      // In auto mode, populate round 1 with teams; in manual mode, leave empty
+      if (r === 1 && mode === 'auto') {
         const slot1 = (p - 1) * 2
         const slot2 = slot1 + 1
         team1Id = ids[slot1] ?? null
@@ -106,39 +107,41 @@ export async function generateBracket(tournamentId: string) {
   await db.insert(bracketMatches).values(values)
 
   // Auto-advance byes: if exactly one team in a match, set it as winner and propagate.
-  // Keep it simple: loop until no changes.
-  let changed = true
-  while (changed) {
-    changed = false
-    const matches = await listBracketMatches(tournamentId)
+  // Only relevant in auto mode (manual mode starts with empty slots).
+  if (mode === 'auto') {
+    let changed = true
+    while (changed) {
+      changed = false
+      const matches = await listBracketMatches(tournamentId)
 
-    for (const m of matches) {
-      if (m.status !== 'pending') continue
-      if (m.roundNumber !== 1) continue
-      if (m.winnerId) continue
+      for (const m of matches) {
+        if (m.status !== 'pending') continue
+        if (m.roundNumber !== 1) continue
+        if (m.winnerId) continue
 
-      const has1 = !!m.team1Id
-      const has2 = !!m.team2Id
-      if (has1 === has2) continue
+        const has1 = !!m.team1Id
+        const has2 = !!m.team2Id
+        if (has1 === has2) continue
 
-      const winnerId = m.team1Id ?? m.team2Id
-      if (!winnerId) continue
+        const winnerId = m.team1Id ?? m.team2Id
+        if (!winnerId) continue
 
-      await db
-        .update(bracketMatches)
-        .set({ winnerId, status: 'completed', updatedAt: Date.now() })
-        .where(eq(bracketMatches.id, m.id))
-
-      if (m.nextMatchId) {
-        const position = m.positionInRound % 2 === 1 ? 'team1Id' : 'team2Id'
-        const patch = position === 'team1Id' ? { team1Id: winnerId } : { team2Id: winnerId }
         await db
           .update(bracketMatches)
-          .set({ ...patch, updatedAt: Date.now() })
-          .where(eq(bracketMatches.id, m.nextMatchId))
-      }
+          .set({ winnerId, status: 'completed', updatedAt: Date.now() })
+          .where(eq(bracketMatches.id, m.id))
 
-      changed = true
+        if (m.nextMatchId) {
+          const position = m.positionInRound % 2 === 1 ? 'team1Id' : 'team2Id'
+          const patch = position === 'team1Id' ? { team1Id: winnerId } : { team2Id: winnerId }
+          await db
+            .update(bracketMatches)
+            .set({ ...patch, updatedAt: Date.now() })
+            .where(eq(bracketMatches.id, m.nextMatchId))
+        }
+
+        changed = true
+      }
     }
   }
 
@@ -168,7 +171,18 @@ export async function recomputeBracket(tournamentId: string) {
     .set({ team1Id: null, team2Id: null, winnerId: null, status: 'pending', updatedAt: now })
     .where(and(eq(bracketMatches.tournamentId, tournamentId), ne(bracketMatches.roundNumber, 1)))
 
-  // Auto-advance ONLY round-1 byes.
+  // Auto-advance ONLY genuine byes (a match with exactly one team because team count
+  // is not a power of two). To distinguish a genuine bye from an in-progress manual
+  // assignment, only auto-advance when ALL round-1 slots that should have teams are
+  // already filled — i.e., the number of assigned teams equals the actual team count.
+  const teamCount = (await listTeams(tournamentId)).length
+  const round1 = (await listBracketMatches(tournamentId)).filter(m => m.roundNumber === 1)
+  const assignedCount = round1.reduce((n, m) => n + (m.team1Id ? 1 : 0) + (m.team2Id ? 1 : 0), 0)
+
+  // If not all teams are placed yet, skip bye auto-advance entirely.
+  if (assignedCount < teamCount) return
+
+  // All teams placed — now auto-advance genuine byes.
   let changed = true
   while (changed) {
     changed = false

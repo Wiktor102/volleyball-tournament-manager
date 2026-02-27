@@ -94,3 +94,16 @@ export const MatchResetSchema = z.object({
   tournamentId: z.string().min(1),
   matchId: z.string().min(1),
 })
+
+export const ScoreSetDirectSchema = z.object({
+  matchId: z.string().min(1),
+  team1Points: z.number().min(0),
+  team2Points: z.number().min(0),
+})
+
+export const SetScoreEditSchema = z.object({
+  matchId: z.string().min(1),
+  setIndex: z.number().min(0),
+  t1: z.number().min(0),
+  t2: z.number().min(0),
+})
