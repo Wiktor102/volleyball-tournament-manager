@@ -123,9 +123,10 @@
 - [x] Tournament setup wizard / creation flow
   - [x] Basic tournament info (name, status)
   - [x] Scoring mode configuration
-  - [ ] Team import (CSV/JSON)
+  - [x] Team import (CSV/JSON)
   - [ ] Bracket generation/import
-- [x] Player management per team
+  - [x] Player management per team
+- [x] Dropping shortName (team shortcuts) across the system
 - [ ] Set management improvements:
   - [ ] Manual set score input
   - [ ] Set duration tracking
@@ -235,3 +236,5 @@ Completed:
 13. ✅ Production build setup (npm run build && npm start)
 14. ✅ Timed scoring mode with timer UI (pause/resume, countdown, overtime display)
 15. ✅ Per-round scoring overrides (e.g., final uses timed mode while other rounds use sets)
+16. ✅ CSV team import (with player roster support)
+17. ✅ Dropped team short names and shortcuts across the system (simplified UI)

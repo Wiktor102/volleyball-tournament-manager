@@ -7,7 +7,6 @@ export type Team = {
   id: string
   tournamentId: string
   name: string
-  shortName: string | null
   color: string | null
   seed: number | null
   eliminated: boolean
@@ -20,7 +19,6 @@ function rowToTeam(row: TeamRow): Team {
     id: row.id,
     tournamentId: row.tournamentId,
     name: row.name,
-    shortName: row.shortName ?? null,
     color: row.color ?? null,
     seed: row.seed ?? null,
     eliminated: !!row.eliminated,
@@ -37,14 +35,13 @@ export async function listTeams(tournamentId: string): Promise<Team[]> {
   return rows.map(rowToTeam)
 }
 
-export async function createTeam(tournamentId: string, input: { name: string; shortName?: string; color?: string }) {
+export async function createTeam(tournamentId: string, input: { name: string; color?: string }) {
   const now = Date.now()
   const teamId = id('team')
   await db.insert(teams).values({
     id: teamId,
     tournamentId,
     name: input.name,
-    shortName: input.shortName ?? null,
     color: input.color ?? null,
     seed: null,
     eliminated: false,
@@ -58,7 +55,7 @@ export async function createTeam(tournamentId: string, input: { name: string; sh
 
 export async function updateTeam(
   teamId: string,
-  patch: Partial<Pick<Team, 'name' | 'shortName' | 'color'>>,
+  patch: Partial<Pick<Team, 'name' | 'color'>>,
 ): Promise<Team | null> {
   const now = Date.now()
   const existing = await getTeam(teamId)
@@ -68,7 +65,6 @@ export async function updateTeam(
     .update(teams)
     .set({
       name: patch.name ?? existing.name,
-      shortName: patch.shortName ?? existing.shortName,
       color: patch.color ?? existing.color,
       updatedAt: now,
     })

@@ -14,7 +14,6 @@ export const JoinTournamentSchema = z.object({
 export const CreateTeamSchema = z.object({
   tournamentId: z.string().min(1),
   name: z.string().min(1),
-  shortName: z.string().min(1).optional(),
   color: z.string().min(1).optional(),
 })
 
@@ -23,7 +22,6 @@ export const UpdateTeamSchema = z.object({
   patch: z
     .object({
       name: z.string().min(1).optional(),
-      shortName: z.string().min(1).optional().nullable(),
       color: z.string().min(1).optional().nullable(),
     })
     .strict(),
@@ -31,6 +29,11 @@ export const UpdateTeamSchema = z.object({
 
 export const DeleteTeamSchema = z.object({
   teamId: z.string().min(1),
+})
+
+export const ImportTeamsSchema = z.object({
+  tournamentId: z.string().min(1),
+  csv: z.string().min(1),
 })
 
 // Player schemas

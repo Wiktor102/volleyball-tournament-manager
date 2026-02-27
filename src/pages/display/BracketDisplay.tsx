@@ -98,7 +98,7 @@ export function BracketDisplay() {
 
   const teamLabel = (t: Team | undefined) => {
     if (!t) return '—'
-    return t.shortName ? `${t.name} (${t.shortName})` : t.name
+    return t.name
   }
 
   const getRoundName = (round: number, totalRounds: number) => {

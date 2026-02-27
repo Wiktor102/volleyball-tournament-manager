@@ -13,7 +13,6 @@ export const teams = sqliteTable('teams', {
   id: text('id').primaryKey(),
   tournamentId: text('tournament_id').notNull(),
   name: text('name').notNull(),
-  shortName: text('short_name'),
   color: text('color'),
   seed: integer('seed'),
   eliminated: integer('eliminated', { mode: 'boolean' }).notNull().default(false),

@@ -89,7 +89,7 @@ export function BracketEditor() {
 
   const teamLabel = (t: Team | undefined) => {
     if (!t) return '—'
-    return t.shortName ? `${t.name} (${t.shortName})` : t.name
+    return t.name
   }
 
   const gen = () => {
@@ -200,8 +200,8 @@ export function BracketEditor() {
   const getMatchDescription = (m: BracketMatch) => {
     const t1 = teams.find((t) => t.id === m.team1Id)
     const t2 = teams.find((t) => t.id === m.team2Id)
-    const t1Name = t1?.shortName || t1?.name || 'TBD'
-    const t2Name = t2?.shortName || t2?.name || 'TBD'
+    const t1Name = t1?.name || 'TBD'
+    const t2Name = t2?.name || 'TBD'
     return `${t1Name} vs ${t2Name}`
   }
 
@@ -341,14 +341,14 @@ export function BracketEditor() {
                                 disabled={!m.team1Id}
                                 onClick={() => end(m.id, m.team1Id!)}
                               >
-                                Wygrywa {t1?.shortName || t1?.name || 'D1'}
+                                Wygrywa {t1?.name || 'D1'}
                               </button>
                               <button
                                 className="btn btn-primary btn-sm"
                                 disabled={!m.team2Id}
                                 onClick={() => end(m.id, m.team2Id!)}
                               >
-                                Wygrywa {t2?.shortName || t2?.name || 'D2'}
+                                Wygrywa {t2?.name || 'D2'}
                               </button>
                               <button className="btn btn-danger btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                                 Reset
@@ -417,14 +417,14 @@ export function BracketEditor() {
                                 disabled={!m.team1Id}
                                 onClick={() => end(m.id, m.team1Id!)}
                               >
-                                Wygrywa {t1?.shortName || t1?.name || 'D1'}
+                                Wygrywa {t1?.name || 'D1'}
                               </button>
                               <button
                                 className="btn btn-primary btn-sm"
                                 disabled={!m.team2Id}
                                 onClick={() => end(m.id, m.team2Id!)}
                               >
-                                Wygrywa {t2?.shortName || t2?.name || 'D2'}
+                                Wygrywa {t2?.name || 'D2'}
                               </button>
                               <button className="btn btn-danger btn-sm" onClick={() => reset(m.id, getMatchDescription(m))}>
                                 Reset

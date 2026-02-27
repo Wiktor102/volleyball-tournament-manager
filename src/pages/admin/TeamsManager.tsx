@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from "../../stores/tournament.store";
@@ -8,7 +8,7 @@ import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
 
-type TeamDraft = { name: string; shortName: string; color: string };
+type TeamDraft = { name: string; color: string };
 type Drafts = Record<string, TeamDraft>;
 
 type Player = {
@@ -30,7 +30,6 @@ export function TeamsManager() {
 	const navigate = useNavigate();
 
 	const [name, setName] = useState("");
-	const [shortName, setShortName] = useState("");
 	const [color, setColor] = useState(() => randomColor());
 
 	const [drafts, setDrafts] = useState<Drafts>({});
@@ -41,6 +40,11 @@ export function TeamsManager() {
 	const [players, setPlayers] = useState<Record<string, Player[]>>({});
 	const [newPlayerName, setNewPlayerName] = useState("");
 	const [loadingPlayers, setLoadingPlayers] = useState<string | null>(null);
+
+	// CSV import state
+	const [importCsv, setImportCsv] = useState("");
+	const [importing, setImporting] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		if (!socket) return;
@@ -61,7 +65,7 @@ export function TeamsManager() {
 				const next = { ...prev };
 				for (const t of state.teams) {
 					if (!next[t.id])
-						next[t.id] = { name: t.name, shortName: t.shortName ?? "", color: t.color ?? randomColor() };
+						next[t.id] = { name: t.name, color: t.color ?? randomColor() };
 				}
 				return next;
 			});
@@ -110,7 +114,6 @@ export function TeamsManager() {
 			{
 				tournamentId: tournament.id,
 				name: name.trim(),
-				shortName: shortName.trim() || undefined,
 				color: color.trim() || undefined
 			},
 			(ack: Ack<Team>) => {
@@ -119,7 +122,6 @@ export function TeamsManager() {
 					return;
 				}
 				setName("");
-				setShortName("");
 				setColor(randomColor());
 				if (ack.data) addToast(`Drużyna "${ack.data.name}" dodana`, "success");
 			}
@@ -132,7 +134,7 @@ export function TeamsManager() {
 		if (!d) return;
 		socket.emit("admin:team:update", {
 			teamId,
-			patch: { name: d.name.trim(), shortName: d.shortName.trim() || null, color: d.color.trim() || null }
+			patch: { name: d.name.trim(), color: d.color.trim() || null }
 		});
 		setEditingId(null);
 		addToast("Drużyna zaktualizowana", "success");
@@ -154,7 +156,7 @@ export function TeamsManager() {
 	const cancelEdit = (teamId: string, team: Team) => {
 		setDrafts(prev => ({
 			...prev,
-			[teamId]: { name: team.name, shortName: team.shortName ?? "", color: team.color ?? randomColor() }
+			[teamId]: { name: team.name, color: team.color ?? randomColor() }
 		}));
 		setEditingId(null);
 	};
@@ -197,6 +199,37 @@ export function TeamsManager() {
 		addToast("Zawodnik usunięty", "info");
 	};
 
+	// CSV import
+	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = ev => {
+			setImportCsv((ev.target?.result as string) ?? "");
+		};
+		reader.readAsText(file, "utf-8");
+		// Reset input so same file can be re-selected
+		e.target.value = "";
+	};
+
+	const importTeams = () => {
+		if (!socket || !tournament || !importCsv.trim()) return;
+		setImporting(true);
+		socket.emit(
+			"admin:teams:import",
+			{ tournamentId: tournament.id, csv: importCsv },
+			(ack: Ack<{ count: number }>) => {
+				setImporting(false);
+				if (!ack.ok) {
+					addToast(ack.error, "error");
+					return;
+				}
+				addToast(`Zaimportowano ${ack.data?.count ?? 0} drużyn`, "success");
+				setImportCsv("");
+			}
+		);
+	};
+
 	return (
 		<div className="admin-page">
 			<div className="admin-container">
@@ -226,19 +259,10 @@ export function TeamsManager() {
 								<label className="form-label">Nazwa drużyny *</label>
 								<input
 									className="form-input"
-									placeholder="np. Siatkarze Wrocław"
+									placeholder="np. Klasa 1C"
 									value={name}
 									onChange={e => setName(e.target.value)}
-								/>
-							</div>
-							<div className="form-group" style={{ flex: 1 }}>
-								<label className="form-label">Skrót</label>
-								<input
-									className="form-input"
-									placeholder="np. SWR"
-									value={shortName}
-									onChange={e => setShortName(e.target.value)}
-									maxLength={5}
+									onKeyDown={e => e.key === "Enter" && canCreate && create()}
 								/>
 							</div>
 							<div className="form-group" style={{ flex: 1 }}>
@@ -263,6 +287,61 @@ export function TeamsManager() {
 					)}
 				</div>
 
+				{/* CSV Import */}
+				<div className="card">
+					<div className="card-header">
+						<h2>Import z pliku CSV</h2>
+					</div>
+					{!tournament ? (
+						<div className="text-muted">Ładowanie...</div>
+					) : (
+						<>
+							<p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>
+								Oczekiwany format: pierwsza linia bloku to nazwa drużyny, kolejne — zawodnicy (Rola; Imię; Nazwisko).
+								Drużyny oddzielone pustą linią.
+							</p>
+							<div className="form-row" style={{ alignItems: "flex-start" }}>
+								<div className="form-group" style={{ flex: 1 }}>
+									<label className="form-label">Plik CSV</label>
+									<input
+										ref={fileInputRef}
+										type="file"
+										accept=".csv,.txt"
+										style={{ display: "none" }}
+										onChange={handleFileChange}
+									/>
+									<button
+										className="btn btn-secondary"
+										onClick={() => fileInputRef.current?.click()}
+									>
+										Wybierz plik…
+									</button>
+								</div>
+								<div className="form-group" style={{ flex: 3 }}>
+									<label className="form-label">Podgląd / wklej CSV</label>
+									<textarea
+										className="form-input"
+										rows={6}
+										style={{ fontFamily: "monospace", fontSize: 12, resize: "vertical" }}
+										placeholder={"Klasa 1C;;;\nKapitan; Tymon; Pacek;;;\nZawodnik 2; Nikodem; Trzop;;;\n\nKlasa 1E;;;\nKapitan; Stanisław; Adamek;;;"}
+										value={importCsv}
+										onChange={e => setImportCsv(e.target.value)}
+									/>
+								</div>
+								<div className="form-group" style={{ flex: 0, alignSelf: "flex-end" }}>
+									<button
+										className="btn btn-primary"
+										onClick={importTeams}
+										disabled={importing || !importCsv.trim()}
+									>
+										{importing ? "Importuję…" : "Importuj"}
+									</button>
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+
 				{/* Teams List */}
 				<div className="card">
 					<div className="card-header">
@@ -278,7 +357,6 @@ export function TeamsManager() {
 							{teams.map(t => {
 								const d = drafts[t.id] ?? {
 									name: t.name,
-									shortName: t.shortName ?? "",
 									color: t.color ?? randomColor()
 								};
 								const isEditing = editingId === t.id;
@@ -299,20 +377,6 @@ export function TeamsManager() {
 																}))
 															}
 															placeholder="Nazwa drużyny"
-														/>
-													</div>
-													<div className="form-group mb-0" style={{ flex: 1 }}>
-														<input
-															className="form-input"
-															value={d.shortName}
-															onChange={e =>
-																setDrafts(prev => ({
-																	...prev,
-																	[t.id]: { ...d, shortName: e.target.value }
-																}))
-															}
-															placeholder="Skrót"
-															maxLength={5}
 														/>
 													</div>
 													<div className="form-group mb-0" style={{ flex: 1 }}>
@@ -364,9 +428,6 @@ export function TeamsManager() {
 															style={{ color: t.color || d.color || undefined }}
 														>
 															{t.name}
-															{t.shortName && (
-																<span className="text-dim"> ({t.shortName})</span>
-															)}
 														</div>
 													</div>
 												</div>
@@ -434,7 +495,7 @@ export function TeamsManager() {
 														<div className="form-row" style={{ marginTop: 8 }}>
 															<input
 																className="form-input form-input-sm"
-																placeholder="Imię zawodnika"
+																placeholder="Imię i nazwisko zawodnika"
 																value={expandedTeamId === t.id ? newPlayerName : ""}
 																onChange={e => setNewPlayerName(e.target.value)}
 																onKeyDown={e => e.key === "Enter" && addPlayer(t.id)}

@@ -33,7 +33,6 @@ export type Team = {
   id: string
   tournamentId: string
   name: string
-  shortName: string | null
   color: string | null
   seed: number | null
   eliminated: boolean

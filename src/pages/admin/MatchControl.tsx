@@ -142,7 +142,7 @@ export function MatchControl() {
 
 	const teamLabel = (t: Team | undefined) => {
 		if (!t) return "—";
-		return t.shortName ? `${t.name} (${t.shortName})` : t.name;
+		return t.name;
 	};
 
 	const loadMatch = () => {
@@ -482,7 +482,7 @@ export function MatchControl() {
 							{canScore && scoringMode === "sets" && (
 								<div className="set-controls">
 									<button className="btn btn-secondary" onClick={() => awardSetToTeam("team1")}>
-										Przyznaj set: {t1?.shortName || t1?.name || "D1"}
+										Przyznaj set: {t1?.name || "D1"}
 									</button>
 									<button
 										className="btn btn-secondary"
@@ -492,7 +492,7 @@ export function MatchControl() {
 										↶ Cofnij ostatni set
 									</button>
 									<button className="btn btn-secondary" onClick={() => awardSetToTeam("team2")}>
-										Przyznaj set: {t2?.shortName || t2?.name || "D2"}
+										Przyznaj set: {t2?.name || "D2"}
 									</button>
 								</div>
 							)}
@@ -523,7 +523,7 @@ export function MatchControl() {
 										end(match.team1Id!);
 									}}
 								>
-									🏆 Wygrywa {t1?.shortName || t1?.name || "Drużyna 1"}
+									🏆 Wygrywa {t1?.name || "Drużyna 1"}
 								</button>
 								<button
 									className="btn btn-primary btn-lg"
@@ -533,7 +533,7 @@ export function MatchControl() {
 										end(match.team2Id!);
 									}}
 								>
-									🏆 Wygrywa {t2?.shortName || t2?.name || "Drużyna 2"}
+									🏆 Wygrywa {t2?.name || "Drużyna 2"}
 								</button>
 
 								<button
