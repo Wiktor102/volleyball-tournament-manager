@@ -31,6 +31,7 @@ export function AdminLayout() {
 	}, []);
 
 	const isBracketPage = location.pathname === "/admin/bracket";
+	const isMatchControlPage = location.pathname.startsWith("/admin/match/");
 	const externalOpen = externalOpenPath === location.pathname;
 	const settingsOpen = settingsOpenPath === location.pathname;
 
@@ -193,7 +194,7 @@ export function AdminLayout() {
 				</div>
 			</header>
 
-			<div className={`admin-container ${isBracketPage ? "admin-container--bracket" : ""}`}>
+		<div className={`admin-container ${isBracketPage ? "admin-container--bracket" : ""} ${isMatchControlPage ? "admin-container--match-control" : ""}`}>
 				<Outlet />
 			</div>
 		</div>

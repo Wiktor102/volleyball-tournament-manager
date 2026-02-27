@@ -181,7 +181,7 @@
   - [ ] Database errors with logging
   - [ ] Error boundaries and loading states
   - [x] Socket disconnection handling (reconnect with state refresh)
-- [ ] Mobile-responsive admin interface
+- [x] Mobile-responsive admin interface (match control tablet-first layout)
 - [ ] Cross-browser testing (Chrome, Firefox, Edge, Safari)
 
 #### 6. Production & Deployment
@@ -255,3 +255,17 @@ Completed:
 Skipped:
 - Undo/redo for admin actions (existing reset/undo-set controls are sufficient)
 - Bracket import from file (skipped per user request)
+
+## Session Work (Feb 27, 2026 — continued)
+
+Completed:
+9. ✅ Match control tablet-first layout — full-screen CSS grid, no scrolling needed on 7-8" tablets
+   - `.match-control-layout` 4-row CSS grid fills viewport minus topbar
+   - Fluid `clamp()`-based score font sizes
+   - Team names truncated with ellipsis on overflow
+   - Set history chips horizontally scrollable when many sets
+   - Manual score edit accessible via footer "✎ Wynik" button
+   - Portrait mode: teams stack vertically (`@media max-width: 700px`)
+   - Short-height landscape mode: extra compression (`@media max-height: 650px`)
+   - `.admin-container--match-control` applied by AdminLayout — reduces outer padding to 8px
+   - Added missing `.btn-warning` CSS class

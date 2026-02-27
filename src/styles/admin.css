@@ -1552,3 +1552,346 @@
   flex-shrink: 0;
   flex-wrap: wrap;
 }
+
+/* ===== Match Control - Tablet-First Full-Screen Layout ===== */
+
+/* Modifier: when on match-control page, reduce outer padding */
+.admin-container--match-control {
+  padding: 8px;
+}
+
+/*
+ * Root grid container.
+ * Fills the remaining viewport below the 56px topbar.
+ * Named rows:
+ *   info     – compact one-line info bar
+ *   sets     – sets score / timer (hidden when not applicable)
+ *   score    – the main scoring area (expands to fill remaining space)
+ *   footer   – set controls + match lifecycle buttons
+ */
+.match-control-layout {
+  display: grid;
+  grid-template-rows:
+    auto   /* info     */
+    auto   /* sets     */
+    1fr    /* score    */
+    auto;  /* footer   */
+  gap: 8px;
+  height: calc(100dvh - 56px - 16px); /* viewport – topbar – outer padding×2 */
+  min-height: 0; /* allow grid children to shrink */
+}
+
+/* Each area is a card-like surface */
+.match-control-layout > .mc-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Info bar (row 1) ---- */
+.mc-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mc-info__back {
+  flex-shrink: 0;
+}
+
+.mc-info__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-info__right {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+/* ---- Sets / Timer row (row 2) ---- */
+.mc-sets {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.mc-sets__score {
+  font-size: 40px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1;
+}
+
+.mc-sets__separator {
+  color: var(--color-text-dim);
+  font-size: 32px;
+}
+
+.mc-sets__label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.mc-sets__history {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.mc-sets__current {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Timer in timed mode (replaces sets row) */
+.mc-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mc-timer__value {
+  font-size: 2.5rem;
+  font-family: monospace;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.mc-timer__controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---- Score area (row 3) ---- */
+.mc-score {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Each team half takes equal space */
+.mc-score__team {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mc-score__team-name {
+  font-size: clamp(13px, 2.5vw, 20px);
+  font-weight: 700;
+  text-align: center;
+  /* Overflow protection for long team names */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-score__value {
+  font-size: clamp(56px, 10vw, 100px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.mc-score__controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.mc-score__vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--color-text-dim);
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+/* Manual score input inside score area */
+.mc-score__manual-input {
+  width: 110px;
+  font-size: clamp(32px, 6vw, 48px) !important;
+  font-weight: 900;
+  text-align: center;
+  padding: 8px !important;
+  margin: 0 auto;
+  display: block;
+}
+
+.mc-score__manual-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* ---- Footer (row 4): set controls + match lifecycle ---- */
+.mc-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mc-footer__set-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.mc-footer__match-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Make win buttons grow equally in footer */
+.mc-footer__match-controls .mc-win-btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Reset / danger button stays small */
+.mc-footer__reset {
+  color: var(--color-danger);
+}
+
+/* ---- btn-warning (was missing) ---- */
+.btn-warning {
+  background: var(--color-warning);
+  color: #000;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #fbbf24;
+}
+
+/* ---- Compact button sizes for tablet ---- */
+.mc-btn-score {
+  padding: 12px 22px;
+  font-size: 20px;
+  font-weight: 700;
+  min-width: 52px;
+}
+
+/* ---- Set result chips (compact) ---- */
+.mc-set-chip {
+  padding: 3px 9px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mc-set-chip--clickable {
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.mc-set-chip--clickable:hover {
+  border-color: var(--color-primary);
+  background: rgba(249, 115, 22, 0.08);
+  color: var(--color-text);
+}
+
+.mc-set-chip--editing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Portrait mode (narrow tablet) ---- */
+@media (max-width: 700px) {
+  .admin-container--match-control {
+    padding: 6px;
+  }
+
+  .match-control-layout {
+    height: auto;
+    min-height: calc(100dvh - 56px - 12px);
+  }
+
+  /* Stack teams vertically in portrait */
+  .mc-score {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mc-score__vs {
+    padding: 2px 0;
+    font-size: 14px;
+  }
+
+  .mc-score__value {
+    font-size: clamp(48px, 18vw, 80px);
+  }
+
+  .mc-score__team-name {
+    font-size: clamp(14px, 4vw, 18px);
+  }
+}
+
+/* ---- Compact landscape: extra height constraints ---- */
+@media (max-height: 650px) {
+  .match-control-layout {
+    gap: 4px;
+  }
+
+  .match-control-layout > .mc-card {
+    padding: 6px 10px;
+  }
+
+  .mc-sets__score {
+    font-size: 28px;
+  }
+
+  .mc-score__value {
+    font-size: clamp(42px, 7vw, 72px);
+  }
+
+  .mc-timer__value {
+    font-size: 1.8rem;
+  }
+}
