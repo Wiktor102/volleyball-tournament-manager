@@ -79,8 +79,15 @@ export function useTournamentDisplay() {
 				setMatchId(state.currentMatch.id);
 				setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null);
 				setMatchStatus((state.currentMatch as { status?: string }).status ?? null);
+			} else {
+				setMatchId(null);
+				setMatchTeams(null, null);
+				setMatchStatus(null);
+				setScore(null);
+				setChallenge(null);
 			}
 			if (state.score) setScore(state.score as MatchScore);
+			else if (state.currentMatch?.id) setScore(null);
 			setUpcomingMatches(state.upcomingMatches ?? []);
 			setRecentMatches(state.recentMatches ?? []);
 			setNextMatch(state.nextMatch ?? null);
