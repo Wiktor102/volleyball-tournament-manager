@@ -1482,15 +1482,8 @@
  */
 .match-control-layout {
   display: grid;
-  grid-template-rows:
-    auto   /* info     */
-    auto   /* sets     */
-    1fr    /* score    */
-    auto   /* events   */
-    auto;  /* footer   */
+  grid-template-rows: repeat(5, auto);  /* footer   */
   gap: 8px;
-  height: calc(100dvh - 56px - 16px); /* viewport – topbar – outer padding×2 */
-  min-height: 0; /* allow grid children to shrink */
 }
 
 /* Each area is a card-like surface */
