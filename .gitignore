@@ -7,3 +7,4 @@ data/*.db*
 *.tsbuildinfo
 .playwright-cli
 nul
+tmpclaude-*

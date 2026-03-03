@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore, type Team, type Tournament, type TournamentState } from "../../stores/tournament.store";
+import { useMatchStore } from "../../stores/match.store";
+import { ChallengeBanner } from "../../components/display/ChallengeBanner";
 import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
@@ -23,6 +25,7 @@ type BracketMatch = {
 export function BracketDisplay() {
 	const { socket, connected, reconnecting, onReconnect } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
+	const challenge = useMatchStore(s => s.challenge);
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 
 	// Function to refresh all state from server
@@ -126,6 +129,17 @@ export function BracketDisplay() {
 						</Link>
 					</div>
 				</div>
+
+				{/* Challenge banner */}
+				{challenge && (
+					<ChallengeBanner
+						challenge={challenge}
+						team1Name={teams[0]?.name ?? "D1"}
+						team2Name={teams[1]?.name ?? "D2"}
+						team1Color={teams[0]?.color}
+						team2Color={teams[1]?.color}
+					/>
+				)}
 
 				{rounds.length === 0 ? (
 					<div className="card">

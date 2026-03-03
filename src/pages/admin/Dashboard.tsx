@@ -101,7 +101,7 @@ export function Dashboard() {
 			socket.off("bracket:updated", onBracket);
 			socket.off("tournament:status:changed", onStatusChanged);
 		};
-	}, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams]);
+	}, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams, addToast]);
 
 	useEffect(() => {
 		if (!socket || !tournament) return;

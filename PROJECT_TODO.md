@@ -73,11 +73,17 @@
 
 ### Phase 6: OBS Streaming Overlay
 - [x] Overlay page (/overlay) with transparent background
-- [x] Score bar component
-  - [x] Team names with colors
-  - [x] Sets score display
-  - [x] Current points display
-  - [x] Score change animations (pop effect with glow)
+- [x] Broadcast-grade overlay overhaul (ESPN/Fox Sports style)
+  - [x] Dedicated overlay CSS (`src/styles/overlay.css`, ~900 lines, 20+ keyframe animations)
+  - [x] Google Fonts loaded (Oswald, Barlow, Barlow Condensed)
+  - [x] ScoreBug — compact top-left ESPN-style scorebug with team colors, sets, points flash, LIVE badge
+  - [x] EventBlast — full-screen dramatic event animations (directional wipe, icon slam, timeout overlay)
+  - [x] CelebrationOverlayNew — particle bursts, shockwave rings, crown icons, gold shimmer for tournament win
+  - [x] StatsWidget — rotating stats cards (match comparison, top aces/blocks leaderboard, events summary)
+  - [x] LowerThird — bottom info ticker with accent bar, rotating panels (next match, progress, last result)
+  - [x] OverlayConfig rewritten with stats widget settings
+- [x] Old overlay components removed (EventBanner, InfoRotator, CelebrationOverlay)
+- [x] Old overlay CSS removed from admin.css
 - [x] Transparent background toggle (?transparent=false)
 
 ### Phase 7: UI Styling & Polish
@@ -216,37 +222,24 @@
 - [x] Bracket position (completed/upcoming matches for selected team)
 - [x] Real-time live-sync (via `useTournamentDisplay` hook)
 
-#### 7. OBS Overlay Enhancements
-- [x] Info rotator component (`src/components/overlay/InfoRotator.tsx`)
-  - [x] Next match preview rotation
-  - [ ] Mini bracket view
-  - [x] Tournament progress
-  - [ ] Custom admin messages
-- [x] Celebration animations (`src/components/overlay/CelebrationOverlay.tsx`)
-  - [x] Set win effect
-  - [x] Match win effect
-  - [ ] Tournament winner celebration
-- [x] Overlay configuration page (/overlay/config)
-  - [ ] Position adjustments
-  - [ ] Color/theme overrides
-  - [x] Component visibility toggles (event banners, rotator, celebrations)
-  - [x] Rotation timing
-  - [x] Animation speed controls (banner duration)
-- [x] Event banner animation component (`src/components/overlay/EventBanner.tsx`)
-  - [x] Listen for `match:event` socket events
-  - [x] Animated banner that slides in from the team side
-  - [x] Auto-dismiss after configurable duration (~3s default)
-  - [x] Event queue (display one at a time, FIFO)
-  - [x] Visual style varies by event type (icon, color, text)
-  - [ ] Challenge event: extended animation with suspense + result display
-  - [x] Dismiss on `match:event:deleted` if banner still showing
-- [x] Integrate EventBanner into StreamOverlay.tsx
-  - [x] Position below score bar
-  - [x] Ensure transparent background compatibility
-- [x] Overlay config: add event animation settings
-  - [x] Enable/disable event banners
-  - [x] Banner duration slider
-  - [x] Animation speed control
+#### 7. OBS Overlay — Broadcast-Grade Overhaul
+- [x] Complete overlay redesign (ESPN/Fox Sports/Polsat Sport style)
+  - [x] ScoreBug — compact top-left with team colors, sets, points flash, set history, LIVE badge
+  - [x] EventBlast — full-screen dramatic event animations (directional wipe, diagonal lines, icon slam)
+  - [x] CelebrationOverlayNew — particle bursts, shockwave rings, crown icon, gold shimmer, phased animation
+  - [x] StatsWidget — rotating stats cards every ~30s (match comparison, aces/blocks leaderboard, events summary)
+  - [x] LowerThird — bottom info ticker with accent bar, rotating panels (next match, progress bar, last result)
+  - [x] Dedicated `src/styles/overlay.css` (~900 lines, 20+ CSS keyframe animations)
+  - [x] Google Fonts: Oswald (display), Barlow (body), Barlow Condensed (labels)
+  - [x] All event types supported: ace, ball-out, challenge, net-touch, block, timeout
+  - [x] Tournament winner celebration with gold particles
+  - [x] Timeout gets special full-screen overlay treatment
+- [x] OverlayConfig rewritten with stats widget settings (interval, display duration, toggle)
+- [x] Old overlay code removed (EventBanner.tsx, InfoRotator.tsx, CelebrationOverlay.tsx, old CSS from admin.css)
+- [ ] Challenge event: extended animation with suspense + result display
+- [ ] Overlay position adjustments (config)
+- [ ] Overlay color/theme overrides (config)
+- [ ] Mini bracket view in stats rotation
 
 #### 8. Stability & Reliability
 - [ ] Multi-admin conflict resolution
@@ -397,9 +390,9 @@ Remaining (not yet implemented):
 - Match history in public PlayerStatsPage
 - Mini bracket view in InfoRotator
 - Custom admin messages in InfoRotator
-- Tournament winner celebration in CelebrationOverlay
-- Challenge extended animation in EventBanner
+- Challenge extended animation in EventBlast
 - Overlay position adjustments and color/theme overrides
+- Mini bracket view in stats rotation
 - §8 Stability: multi-admin conflict resolution, error boundaries/recovery UI
 - §9 Deployment: Polish docs, deployment guide, USB portable test
 - §10 Testing: unit/integration/UI tests
@@ -419,3 +412,19 @@ Completed:
     - `LoginPage` with Polish-language password form
     - Logout button added to admin top bar
     - Root `/` redirects to `/display/fan` by default
+
+## Session Work (Feb 27, 2026 — OBS Overlay Overhaul)
+
+Completed:
+25. ✅ Complete OBS overlay redesign — broadcast-grade ESPN/Fox Sports style
+    - ScoreBug: compact top-left widget with team colors, sets dots, points flash animation, set history, LIVE badge
+    - EventBlast: full-screen dramatic animations with directional wipe, diagonal lines, icon slam, expanding label; timeout special overlay
+    - CelebrationOverlayNew: particle bursts, shockwave rings, crown icons, gold shimmer for tournament win, phased enter/visible/exit
+    - StatsWidget: rotating stats cards (match comparison, top aces, top blocks, events summary) appearing every ~30s
+    - LowerThird: bottom info ticker with accent bar, rotating panels (next match, progress bar, last result, tournament name)
+    - Dedicated `src/styles/overlay.css` (~900 lines, 20+ CSS keyframe animations)
+    - Google Fonts: Oswald (display), Barlow (body), Barlow Condensed (labels)
+    - OverlayConfig rewritten with stats widget settings
+    - Old overlay components deleted (EventBanner.tsx, InfoRotator.tsx, CelebrationOverlay.tsx)
+    - Old overlay CSS removed from admin.css (~400 lines)
+    - Build verified — no TypeScript errors

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore } from "../../stores/tournament.store";
+import { useMatchStore } from "../../stores/match.store";
+import { ChallengeBanner } from "../../components/display/ChallengeBanner";
 import { useEventStore, type MatchStats, type PlayerStats } from "../../stores/event.store";
 import "../../styles/admin.css";
 
@@ -21,7 +23,7 @@ const EVENT_LABELS: { key: string; label: string }[] = [
 	{ key: "block", label: "Bloki" },
 	{ key: "net-touch", label: "Siatki" },
 	{ key: "challenge", label: "Challenge" },
-	{ key: "timeout", label: "Czas" },
+	{ key: "timeout", label: "Czas" }
 ];
 
 const POSITION_LABELS: Record<string, string> = {
@@ -30,34 +32,33 @@ const POSITION_LABELS: Record<string, string> = {
 	outside: "Atakujący z lewej",
 	middle: "Środkowy",
 	opposite: "Atakujący z prawej",
-	universal: "Uniwersalny",
+	universal: "Uniwersalny"
 };
 
 export function TeamStatsPage() {
 	const { id: teamId } = useParams<{ id: string }>();
 	const { socket } = useSocket();
 	const { tournament, teams } = useTournamentStore();
+	const challenge = useMatchStore(s => s.challenge);
 	const { teamStats, playerStats, setTeamStats, setPlayerStats } = useEventStore();
 
 	const [teamPlayers, setTeamPlayers] = useState<Player[]>([]);
-	const [loading, setLoading] = useState(false);
+	const [lastLoadedKey, setLastLoadedKey] = useState("");
 
 	const tournamentId = tournament?.id ?? "";
 	const team = teams.find(t => t.id === teamId);
 	const statsEnabled = tournament?.settings?.playerStatsEnabled === true;
+	const requestKey = socket && tournamentId && teamId ? `${tournamentId}:${teamId}` : "";
+	const loading = Boolean(requestKey) && lastLoadedKey !== requestKey;
 
 	// Fetch team stats
 	useEffect(() => {
 		if (!socket || !tournamentId || !teamId) return;
-		setLoading(true);
-		socket.emit(
-			"stats:team:get",
-			{ tournamentId, teamId },
-			(ack: Ack<MatchStats>) => {
-				setLoading(false);
-				if (ack.ok && ack.data) setTeamStats(tournamentId, teamId, ack.data);
-			}
-		);
+		const key = `${tournamentId}:${teamId}`;
+		socket.emit("stats:team:get", { tournamentId, teamId }, (ack: Ack<MatchStats>) => {
+			setLastLoadedKey(key);
+			if (ack.ok && ack.data) setTeamStats(tournamentId, teamId, ack.data);
+		});
 	}, [socket, tournamentId, teamId, setTeamStats]);
 
 	// Fetch player stats
@@ -79,15 +80,11 @@ export function TeamStatsPage() {
 	const ts = teamStats[`${tournamentId}:${teamId}`];
 	const allPlayerStats = playerStats[tournamentId] ?? [];
 
-	const getPlayerStats = (playerId: string) =>
-		allPlayerStats.find(ps => ps.playerId === playerId);
+	const getPlayerStats = (playerId: string) => allPlayerStats.find(ps => ps.playerId === playerId);
 
 	// Sum both team slots for team totals
 	const getTotal = (type: string) =>
-		ts
-			? (ts.team1[type as keyof typeof ts.team1] ?? 0) +
-			  (ts.team2[type as keyof typeof ts.team2] ?? 0)
-			: 0;
+		ts ? (ts.team1[type as keyof typeof ts.team1] ?? 0) + (ts.team2[type as keyof typeof ts.team2] ?? 0) : 0;
 
 	if (!team) {
 		return (
@@ -107,13 +104,14 @@ export function TeamStatsPage() {
 		<div className="display-page">
 			<div className="display-container">
 				<div className="display-header">
-					<h1 style={{ color: team.color || undefined }}>
-						{team.name} — Statystyki
-					</h1>
+					<h1 style={{ color: team.color || undefined }}>{team.name} — Statystyki</h1>
 					<Link to="/display/stats" className="btn btn-secondary btn-sm">
 						Powrót
 					</Link>
 				</div>
+
+				{/* Challenge banner */}
+				{challenge && <ChallengeBanner challenge={challenge} team1Name="Drużyna 1" team2Name="Drużyna 2" />}
 
 				{!statsEnabled && (
 					<div className="card">
@@ -132,7 +130,9 @@ export function TeamStatsPage() {
 								<h2>Statystyki drużyny</h2>
 							</div>
 							{loading ? (
-								<div className="text-muted" style={{ padding: 16 }}>Ładowanie...</div>
+								<div className="text-muted" style={{ padding: 16 }}>
+									Ładowanie...
+								</div>
 							) : (
 								<div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
 									{EVENT_LABELS.map(({ key, label }) => (
@@ -180,20 +180,39 @@ export function TeamStatsPage() {
 															{player.jerseyNumber ?? "—"}
 														</td>
 														<td className="stats-table__td stats-table__td--name">
-															<Link to={`/display/stats/player/${player.id}`} className="stats-link">
+															<Link
+																to={`/display/stats/player/${player.id}`}
+																className="stats-link"
+															>
 																{player.name}
 															</Link>
 														</td>
 														<td className="stats-table__td">
-															{player.position ? POSITION_LABELS[player.position] ?? player.position : "—"}
+															{player.position
+																? (POSITION_LABELS[player.position] ?? player.position)
+																: "—"}
 														</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["ace"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["ball-out"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["block"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["net-touch"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["challenge"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num">{ps?.stats["timeout"] ?? 0}</td>
-														<td className="stats-table__td stats-table__td--num stats-table__td--total">{ps?.totalEvents ?? 0}</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["ace"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["ball-out"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["block"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["net-touch"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["challenge"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{ps?.stats["timeout"] ?? 0}
+														</td>
+														<td className="stats-table__td stats-table__td--num stats-table__td--total">
+															{ps?.totalEvents ?? 0}
+														</td>
 													</tr>
 												);
 											})}

@@ -25,7 +25,7 @@ const COL_HEADERS: { key: SortKey; label: string }[] = [
 	{ key: "net-touch", label: "Siatki" },
 	{ key: "challenge", label: "Challenge" },
 	{ key: "timeout", label: "Czas" },
-	{ key: "total", label: "Razem" },
+	{ key: "total", label: "Razem" }
 ];
 
 export function PlayerStats() {
@@ -34,8 +34,8 @@ export function PlayerStats() {
 	const { playerStats, setPlayerStats } = useEventStore();
 
 	const [allPlayers, setAllPlayers] = useState<Player[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [lastLoadedKey, setLastLoadedKey] = useState("");
+	const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
 
 	const [sortKey, setSortKey] = useState<SortKey>("total");
 	const [sortAsc, setSortAsc] = useState(false);
@@ -43,20 +43,22 @@ export function PlayerStats() {
 
 	const statsEnabled = tournament?.settings?.playerStatsEnabled === true;
 	const tournamentId = tournament?.id ?? "";
+	const requestKey = statsEnabled && tournamentId ? tournamentId : "";
+	const loading = Boolean(requestKey) && lastLoadedKey !== requestKey;
+	const error = errorState?.key === requestKey ? errorState.message : null;
 
 	// Fetch stats
 	useEffect(() => {
 		if (!socket || !tournamentId || !statsEnabled) return;
-
-		setLoading(true);
-		setError(null);
+		const key = tournamentId;
 
 		socket.emit("stats:player:get", { tournamentId }, (ack: Ack<PlayerStats[]>) => {
-			setLoading(false);
+			setLastLoadedKey(key);
 			if (!ack.ok) {
-				setError(ack.error);
+				setErrorState({ key, message: ack.error });
 				return;
 			}
+			setErrorState(null);
 			setPlayerStats(tournamentId, ack.data ?? []);
 		});
 	}, [socket, tournamentId, statsEnabled, setPlayerStats]);
@@ -92,10 +94,12 @@ export function PlayerStats() {
 		};
 
 		socket.on("match:event", refetch);
-		return () => { socket.off("match:event", refetch); };
+		return () => {
+			socket.off("match:event", refetch);
+		};
 	}, [socket, tournamentId, statsEnabled, setPlayerStats]);
 
-	const stats = playerStats[tournamentId] ?? [];
+	const stats = useMemo(() => playerStats[tournamentId] ?? [], [playerStats, tournamentId]);
 
 	type Row = {
 		playerId: string;
@@ -126,7 +130,7 @@ export function PlayerStats() {
 				"net-touch": ps.stats["net-touch"] ?? 0,
 				challenge: ps.stats["challenge"] ?? 0,
 				timeout: ps.stats["timeout"] ?? 0,
-				total: ps.totalEvents,
+				total: ps.totalEvents
 			};
 		});
 	}, [stats, allPlayers, teams]);
@@ -195,14 +199,24 @@ export function PlayerStats() {
 						>
 							<option value="">Wszystkie drużyny</option>
 							{teams.map(t => (
-								<option key={t.id} value={t.id}>{t.name}</option>
+								<option key={t.id} value={t.id}>
+									{t.name}
+								</option>
 							))}
 						</select>
 					</div>
 				</div>
 
-				{loading && <div className="text-muted" style={{ padding: 16 }}>Ładowanie statystyk...</div>}
-				{error && <div className="text-muted" style={{ padding: 16, color: "var(--color-danger)" }}>Błąd: {error}</div>}
+				{loading && (
+					<div className="text-muted" style={{ padding: 16 }}>
+						Ładowanie statystyk...
+					</div>
+				)}
+				{error && (
+					<div className="text-muted" style={{ padding: 16, color: "var(--color-danger)" }}>
+						Błąd: {error}
+					</div>
+				)}
 
 				{!loading && !error && (
 					<div style={{ overflowX: "auto" }}>
@@ -227,7 +241,10 @@ export function PlayerStats() {
 							<tbody>
 								{sorted.length === 0 ? (
 									<tr>
-										<td colSpan={COL_HEADERS.length} style={{ textAlign: "center", padding: 24, color: "var(--color-text-muted)" }}>
+										<td
+											colSpan={COL_HEADERS.length}
+											style={{ textAlign: "center", padding: 24, color: "var(--color-text-muted)" }}
+										>
 											Brak danych statystycznych
 										</td>
 									</tr>
@@ -242,7 +259,9 @@ export function PlayerStats() {
 											<td className="stats-table__td stats-table__td--num">{row["net-touch"]}</td>
 											<td className="stats-table__td stats-table__td--num">{row.challenge}</td>
 											<td className="stats-table__td stats-table__td--num">{row.timeout}</td>
-											<td className="stats-table__td stats-table__td--num stats-table__td--total">{row.total}</td>
+											<td className="stats-table__td stats-table__td--num stats-table__td--total">
+												{row.total}
+											</td>
 										</tr>
 									))
 								)}

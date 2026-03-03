@@ -218,7 +218,7 @@ export async function startMatch(tournamentId: string, matchId: string) {
 		if (t && t.status !== "live" && t.status !== "completed") {
 			await updateTournament(tournamentId, { status: "live" });
 		}
-	} catch (e) {
+	} catch {
 		// Don't block starting the match if tournament status update fails.
 	}
 

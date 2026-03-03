@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import { useTournamentStore, type Team } from "../../stores/tournament.store";
+import { useMatchStore } from "../../stores/match.store";
+import { ChallengeBanner } from "../../components/display/ChallengeBanner";
 import { useEventStore, type PlayerStats, type MatchStats } from "../../stores/event.store";
 import "../../styles/admin.css";
 
@@ -39,20 +41,22 @@ function useAllPlayers(teams: Team[]) {
 export function StatsDisplay() {
 	const { socket } = useSocket();
 	const { tournament, teams } = useTournamentStore();
+	const challenge = useMatchStore(s => s.challenge);
 	const { playerStats, teamStats, setPlayerStats, setTeamStats } = useEventStore();
 
-	const [loading, setLoading] = useState(false);
+	const [loadedTournamentId, setLoadedTournamentId] = useState("");
 	const allPlayers = useAllPlayers(teams);
 
 	const statsEnabled = tournament?.settings?.playerStatsEnabled === true;
 	const tournamentId = tournament?.id ?? "";
+	const loading = Boolean(tournamentId) && loadedTournamentId !== tournamentId;
 
 	// Fetch player stats
 	useEffect(() => {
 		if (!socket || !tournamentId) return;
-		setLoading(true);
+		const key = tournamentId;
 		socket.emit("stats:player:get", { tournamentId }, (ack: Ack<PlayerStats[]>) => {
-			setLoading(false);
+			setLoadedTournamentId(key);
 			if (ack.ok) setPlayerStats(tournamentId, ack.data ?? []);
 		});
 	}, [socket, tournamentId, setPlayerStats]);
@@ -61,13 +65,9 @@ export function StatsDisplay() {
 	useEffect(() => {
 		if (!socket || !tournamentId || teams.length === 0) return;
 		for (const team of teams) {
-			socket.emit(
-				"stats:team:get",
-				{ tournamentId, teamId: team.id },
-				(ack: Ack<MatchStats>) => {
-					if (ack.ok && ack.data) setTeamStats(tournamentId, team.id, ack.data);
-				}
-			);
+			socket.emit("stats:team:get", { tournamentId, teamId: team.id }, (ack: Ack<MatchStats>) => {
+				if (ack.ok && ack.data) setTeamStats(tournamentId, team.id, ack.data);
+			});
 		}
 	}, [socket, tournamentId, teams, setTeamStats]);
 
@@ -79,20 +79,18 @@ export function StatsDisplay() {
 				if (ack.ok) setPlayerStats(tournamentId, ack.data ?? []);
 			});
 			for (const team of teams) {
-				socket.emit(
-					"stats:team:get",
-					{ tournamentId, teamId: team.id },
-					(ack: Ack<MatchStats>) => {
-						if (ack.ok && ack.data) setTeamStats(tournamentId, team.id, ack.data);
-					}
-				);
+				socket.emit("stats:team:get", { tournamentId, teamId: team.id }, (ack: Ack<MatchStats>) => {
+					if (ack.ok && ack.data) setTeamStats(tournamentId, team.id, ack.data);
+				});
 			}
 		};
 		socket.on("match:event", refetch);
-		return () => { socket.off("match:event", refetch); };
+		return () => {
+			socket.off("match:event", refetch);
+		};
 	}, [socket, tournamentId, teams, setPlayerStats, setTeamStats]);
 
-	const stats = playerStats[tournamentId] ?? [];
+	const stats = useMemo(() => playerStats[tournamentId] ?? [], [playerStats, tournamentId]);
 
 	// Top aces players
 	const topAces = useMemo(() => {
@@ -110,8 +108,7 @@ export function StatsDisplay() {
 			.filter(ps => (ps.stats["block"] ?? 0) > 0);
 	}, [stats]);
 
-	const getPlayerName = (playerId: string) =>
-		allPlayers.find(p => p.id === playerId)?.name ?? playerId;
+	const getPlayerName = (playerId: string) => allPlayers.find(p => p.id === playerId)?.name ?? playerId;
 
 	const getTeamName = (playerId: string) => {
 		const teamId = allPlayers.find(p => p.id === playerId)?.teamId;
@@ -130,6 +127,9 @@ export function StatsDisplay() {
 					</div>
 				</div>
 
+				{/* Challenge banner */}
+				{challenge && <ChallengeBanner challenge={challenge} team1Name="Drużyna 1" team2Name="Drużyna 2" />}
+
 				{!statsEnabled ? (
 					<div className="card">
 						<div className="empty-state">
@@ -139,7 +139,9 @@ export function StatsDisplay() {
 					</div>
 				) : loading ? (
 					<div className="card">
-						<div className="text-muted" style={{ padding: 16 }}>Ładowanie statystyk...</div>
+						<div className="text-muted" style={{ padding: 16 }}>
+							Ładowanie statystyk...
+						</div>
 					</div>
 				) : (
 					<>
@@ -154,17 +156,24 @@ export function StatsDisplay() {
 										Najlepsze asy
 									</h3>
 									{topAces.length === 0 ? (
-										<p className="text-muted" style={{ fontSize: 13 }}>Brak danych</p>
+										<p className="text-muted" style={{ fontSize: 13 }}>
+											Brak danych
+										</p>
 									) : (
 										<ol className="stats-leaderboard">
 											{topAces.map((ps, i) => (
 												<li key={ps.playerId} className="stats-leaderboard__item">
 													<span className="stats-leaderboard__rank">{i + 1}</span>
 													<div className="stats-leaderboard__info">
-														<Link to={`/display/stats/player/${ps.playerId}`} className="stats-leaderboard__name">
+														<Link
+															to={`/display/stats/player/${ps.playerId}`}
+															className="stats-leaderboard__name"
+														>
 															{getPlayerName(ps.playerId)}
 														</Link>
-														<span className="stats-leaderboard__team">{getTeamName(ps.playerId)}</span>
+														<span className="stats-leaderboard__team">
+															{getTeamName(ps.playerId)}
+														</span>
 													</div>
 													<span className="stats-leaderboard__value">{ps.stats["ace"]}</span>
 												</li>
@@ -177,17 +186,24 @@ export function StatsDisplay() {
 										Najlepsze bloki
 									</h3>
 									{topBlocks.length === 0 ? (
-										<p className="text-muted" style={{ fontSize: 13 }}>Brak danych</p>
+										<p className="text-muted" style={{ fontSize: 13 }}>
+											Brak danych
+										</p>
 									) : (
 										<ol className="stats-leaderboard">
 											{topBlocks.map((ps, i) => (
 												<li key={ps.playerId} className="stats-leaderboard__item">
 													<span className="stats-leaderboard__rank">{i + 1}</span>
 													<div className="stats-leaderboard__info">
-														<Link to={`/display/stats/player/${ps.playerId}`} className="stats-leaderboard__name">
+														<Link
+															to={`/display/stats/player/${ps.playerId}`}
+															className="stats-leaderboard__name"
+														>
 															{getPlayerName(ps.playerId)}
 														</Link>
-														<span className="stats-leaderboard__team">{getTeamName(ps.playerId)}</span>
+														<span className="stats-leaderboard__team">
+															{getTeamName(ps.playerId)}
+														</span>
 													</div>
 													<span className="stats-leaderboard__value">{ps.stats["block"]}</span>
 												</li>
@@ -204,7 +220,9 @@ export function StatsDisplay() {
 								<h2>Statystyki drużyn</h2>
 							</div>
 							{teams.length === 0 ? (
-								<p className="text-muted" style={{ fontSize: 13 }}>Brak drużyn</p>
+								<p className="text-muted" style={{ fontSize: 13 }}>
+									Brak drużyn
+								</p>
 							) : (
 								<div style={{ overflowX: "auto" }}>
 									<table className="stats-table">
@@ -227,25 +245,48 @@ export function StatsDisplay() {
 												// Sum both slots for display purposes
 												const total = ts
 													? Object.values(ts.team1).reduce((s, n) => s + n, 0) +
-													  Object.values(ts.team2).reduce((s, n) => s + n, 0)
+														Object.values(ts.team2).reduce((s, n) => s + n, 0)
 													: 0;
 												const get = (type: string) =>
-													ts ? (ts.team1[type as keyof typeof ts.team1] ?? 0) + (ts.team2[type as keyof typeof ts.team2] ?? 0) : 0;
+													ts
+														? (ts.team1[type as keyof typeof ts.team1] ?? 0) +
+															(ts.team2[type as keyof typeof ts.team2] ?? 0)
+														: 0;
 
 												return (
 													<tr key={team.id} className="stats-table__row">
-														<td className="stats-table__td stats-table__td--name" style={{ color: team.color || undefined }}>
+														<td
+															className="stats-table__td stats-table__td--name"
+															style={{ color: team.color || undefined }}
+														>
 															{team.name}
 														</td>
-														<td className="stats-table__td stats-table__td--num">{get("ace")}</td>
-														<td className="stats-table__td stats-table__td--num">{get("ball-out")}</td>
-														<td className="stats-table__td stats-table__td--num">{get("block")}</td>
-														<td className="stats-table__td stats-table__td--num">{get("net-touch")}</td>
-														<td className="stats-table__td stats-table__td--num">{get("challenge")}</td>
-														<td className="stats-table__td stats-table__td--num">{get("timeout")}</td>
-														<td className="stats-table__td stats-table__td--num stats-table__td--total">{total}</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("ace")}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("ball-out")}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("block")}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("net-touch")}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("challenge")}
+														</td>
+														<td className="stats-table__td stats-table__td--num">
+															{get("timeout")}
+														</td>
+														<td className="stats-table__td stats-table__td--num stats-table__td--total">
+															{total}
+														</td>
 														<td className="stats-table__td">
-															<Link to={`/display/stats/team/${team.id}`} className="btn btn-secondary btn-xs">
+															<Link
+																to={`/display/stats/team/${team.id}`}
+																className="btn btn-secondary btn-xs"
+															>
 																Szczegóły
 															</Link>
 														</td>
