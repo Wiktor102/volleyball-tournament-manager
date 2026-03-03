@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    container_name: volleyball-tournament
+    restart: unless-stopped
+    ports:
+      - "6789:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATA_DIR: /app/data
+      DB_FILE: /app/data/tournament.db
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+    volumes:
+      - volleyball_data:/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: volleyball-tunnel
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:?Set CF_TUNNEL_TOKEN in .env}
+
+volumes:
+  volleyball_data:

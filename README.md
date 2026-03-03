@@ -14,6 +14,42 @@ npm run dev
 - Frontend: http://localhost:5173
 - Backend: http://localhost:5174 (health: `/api/health`)
 
+## Docker Compose (prod, LAN)
+
+1. Skopiuj plik środowiskowy i ustaw hasło administratora:
+
+```bash
+cp .env.example .env
+```
+
+2. Uruchom aplikację:
+
+```bash
+docker compose up -d --build
+```
+
+3. Sprawdź publiczny adres Cloudflare Quick Tunnel:
+
+```bash
+docker compose logs -f cloudflared
+```
+
+W logach pojawi się URL `https://<losowy-subdomena>.trycloudflare.com`.
+
+4. Otwórz aplikację:
+
+- `http://localhost:6789`
+- z innego urządzenia w LAN: `http://<IP_tego_komputera>:6789`
+- z internetu (tymczasowo): URL z logów `cloudflared`
+
+SQLite jest zapisywany w named volume `volleyball_data` (`/app/data/tournament.db`), więc dane pozostają po `docker compose build` i odtworzeniu kontenera.
+
+Zatrzymanie:
+
+```bash
+docker compose down
+```
+
 ## Widoki
 - `/admin` – panel administratora (przycisk „Utwórz mecz demo” + sterowanie punktami)
 - `/display/fan` – widok dla kibiców (duże wyniki)
