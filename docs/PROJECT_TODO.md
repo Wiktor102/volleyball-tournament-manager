@@ -428,3 +428,31 @@ Completed:
     - Old overlay components deleted (EventBanner.tsx, InfoRotator.tsx, CelebrationOverlay.tsx)
     - Old overlay CSS removed from admin.css (~400 lines)
     - Build verified — no TypeScript errors
+
+## Session Work (Mar 4, 2026 — Scoring Rules Rework)
+
+Completed:
+26. ✅ Scoring rules rework — `TournamentSetup`
+    - Added `tiebreakByTotalPoints` option to `ScoringSettings` type (frontend store + server service)
+    - New preset-based scoring UI in `TournamentSetup` (`ScoringPresetSelector` + `RoundOverridesEditor` components)
+    - Presets: "2 sety po 11 pkt (punkty decydują)", "Do 2 setów po 15 pkt", "Do 2 setów po 25 pkt", "Na czas", "Własny"
+    - `RoundOverridesEditor` fully rewrites the per-round override form with the same preset cards
+    - Scoring preset cards CSS added to `admin.css`
+27. ✅ `tiebreakByTotalPoints` logic in `match.service.ts` `incrementPoint`
+    - When sets are tied at `setsToWin-1` each, winner resolved by total accumulated points
+    - If total points also tied → plays an advantage "set" (first to score with mustWinByTwo lead)
+28. ✅ Match Control — correct scoring rule integration
+    - Sets reset automatically (server-side) after each set is won via `incrementPoint` or `awardSet`
+    - `suggestedWinnerId` computed client-side: team that has reached `setsToWin` sets is auto-suggested
+    - Winner confirmation is a simple (non-danger) dialog when the team meets the criteria
+    - Attempting to declare a winner who hasn't met the criteria shows a warning dialog with the criteria shortfall message
+    - Suggested winner banner displayed above win buttons when criteria are met
+    - Win button for the suggested winner highlighted with `btn-success`; opponent's button dimmed to `btn-secondary`
+    - `tiebreakByTotalPoints` info banner already present (shows totals and "playing advantage set" state)
+29. ✅ Fix: `fixed2x11_totalpoints` no longer starts visual 3rd set on equal total points
+  - Advantage phase now stays attached to set 2 in `incrementPoint` logic
+  - Counters no longer reset when totals tie; live points continue accumulating from the last set score instead of jumping back to 0
+  - Deciding points are merged into set 2 score when the advantage phase resolves
+30. ✅ Overlay behavior during advantage-stage transition
+  - Fullscreen "Set Won" celebration is suppressed when a tied-total set transitions into attached advantage stage
+  - Scorebug now shows an explicit `⚡ PRZEWAGA` annotation while advantage stage is active

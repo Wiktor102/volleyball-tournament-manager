@@ -11,6 +11,28 @@ interface ScoreBugProps {
 	challenge?: ChallengeState;
 }
 
+function isAttachedAdvantageStage(score: MatchScore): boolean {
+	const config = score.scoringMode;
+	if (!config || config.mode !== "sets" || !config.tiebreakByTotalPoints) return false;
+
+	const setsToWin = score.setsToWin ?? config.setsToWin ?? 2;
+	const regularSetCount = setsToWin * 2 - 2;
+	if (regularSetCount < 1) return false;
+
+	const completedTotals = (score.setScores ?? []).reduce((acc, s) => ({ t1: acc.t1 + s.t1, t2: acc.t2 + s.t2 }), {
+		t1: 0,
+		t2: 0
+	});
+
+	return (
+		Math.abs(score.team1Sets - score.team2Sets) === 1 &&
+		Math.max(score.team1Sets, score.team2Sets) === setsToWin - 1 &&
+		score.currentSet === regularSetCount &&
+		(score.setScores?.length ?? 0) >= regularSetCount &&
+		completedTotals.t1 === completedTotals.t2
+	);
+}
+
 export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, challenge }: ScoreBugProps) {
 	const t1PointsRef = useRef<HTMLDivElement>(null);
 	const t2PointsRef = useRef<HTMLDivElement>(null);
@@ -31,6 +53,8 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 	const hasSets = (score.setsToWin ?? 1) > 1;
 	const setScores = score.setScores ?? [];
 	const headerText = matchLabel || tournamentName;
+	const isAdvantageStage = isAttachedAdvantageStage(score);
+	const showChallengeBadge = challenge?.status === "pending";
 
 	return (
 		<>
@@ -74,8 +98,13 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 					</div>
 				)}
 
-				{/* Challenge badge */}
-				{challenge?.status === "pending" && <div className="ov-scorebug__challenge-badge">CHALLENGE</div>}
+				{/* State badges */}
+				{(isAdvantageStage || showChallengeBadge) && (
+					<div className="ov-scorebug__badges">
+						{isAdvantageStage && <div className="ov-scorebug__advantage-badge">⚡ PRZEWAGA</div>}
+						{showChallengeBadge && <div className="ov-scorebug__challenge-badge">CHALLENGE</div>}
+					</div>
+				)}
 			</div>
 
 			{/* Set history below scorebug */}

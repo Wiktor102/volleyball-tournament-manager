@@ -4,8 +4,8 @@ This project aims to create a complex **Volleyball Tournament Management System*
 
 ## Plan and TODOs
 
-- Refer to `plan.md` for architecture and conventions. Ask for clarification if necessary.
-- Always use `PROJECT_TODO.md` for the up-to-date task list. **Update it every time you implement a feature.**
+- Refer to `docs/plan.md` for architecture and conventions. Ask for clarification if necessary.
+- Always use `docs/PROJECT_TODO.md` for the up-to-date task list. **Update it every time you implement a feature.**
 - If asked for any architecture changes, make sure to update those files accordingly.
 
 ## Workflow

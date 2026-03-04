@@ -18,6 +18,51 @@ type CelebrationState = {
 	phase: "enter" | "visible" | "exit";
 } | null;
 
+type ScoreUpdate = {
+	matchId?: string;
+	team1Sets?: number;
+	team2Sets?: number;
+	team1Id?: string;
+	team2Id?: string;
+	team1CurrentPoints?: number;
+	team2CurrentPoints?: number;
+	currentSet?: number;
+	setsToWin?: number;
+	setScores?: { t1: number; t2: number }[];
+	scoringMode?: {
+		mode?: "sets" | "points" | "timed";
+		setsToWin?: number;
+		tiebreakByTotalPoints?: boolean;
+	} | null;
+};
+
+function isAttachedAdvantageStage(score: ScoreUpdate): boolean {
+	const config = score.scoringMode;
+	if (!config || config.mode !== "sets" || !config.tiebreakByTotalPoints) return false;
+
+	const setsToWin = score.setsToWin ?? config.setsToWin ?? 2;
+	const regularSetCount = setsToWin * 2 - 2;
+	if (regularSetCount < 1) return false;
+
+	const t1Sets = score.team1Sets ?? 0;
+	const t2Sets = score.team2Sets ?? 0;
+	const currentSet = score.currentSet ?? 1;
+	const completedSetCount = score.setScores?.length ?? 0;
+
+	const completedTotals = (score.setScores ?? []).reduce((acc, s) => ({ t1: acc.t1 + s.t1, t2: acc.t2 + s.t2 }), {
+		t1: 0,
+		t2: 0
+	});
+
+	return (
+		Math.abs(t1Sets - t2Sets) === 1 &&
+		Math.max(t1Sets, t2Sets) === setsToWin - 1 &&
+		currentSet === regularSetCount &&
+		completedSetCount >= regularSetCount &&
+		completedTotals.t1 === completedTotals.t2
+	);
+}
+
 function isCelebrationsEnabled(): boolean {
 	try {
 		const val = localStorage.getItem("celebrationsEnabled");
@@ -65,6 +110,7 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const prevSetsRef = useRef<{ team1Sets: number; team2Sets: number } | null>(null);
+	const prevAdvantageRef = useRef(false);
 	const lastCompletedMatchRef = useRef<string | null>(null);
 
 	const particles = celebration
@@ -116,29 +162,23 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 	useEffect(() => {
 		if (!socket) return;
 
-		const onScore = (s: {
-			matchId?: string;
-			team1Sets?: number;
-			team2Sets?: number;
-			team1Id?: string;
-			team2Id?: string;
-			team1CurrentPoints?: number;
-			team2CurrentPoints?: number;
-		}) => {
+		const onScore = (s: ScoreUpdate) => {
 			if (s.matchId && s.matchId !== matchId) return;
 
 			const t1Sets = s.team1Sets ?? 0;
 			const t2Sets = s.team2Sets ?? 0;
 			const prev = prevSetsRef.current;
+			const nowInAdvantageStage = isAttachedAdvantageStage(s);
+			const enteringAdvantageStage = !prevAdvantageRef.current && nowInAdvantageStage;
 
 			if (prev) {
-				if (t1Sets > prev.team1Sets) {
+				if (t1Sets > prev.team1Sets && !enteringAdvantageStage) {
 					const team = teams.find(t => t.id === s.team1Id);
 					triggerCelebration(team?.name ?? "Druzyna 1", team?.color ?? "#FFD23F", "set", 3000, {
 						t1: t1Sets,
 						t2: t2Sets
 					});
-				} else if (t2Sets > prev.team2Sets) {
+				} else if (t2Sets > prev.team2Sets && !enteringAdvantageStage) {
 					const team = teams.find(t => t.id === s.team2Id);
 					triggerCelebration(team?.name ?? "Druzyna 2", team?.color ?? "#FFD23F", "set", 3000, {
 						t1: t1Sets,
@@ -148,6 +188,7 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 			}
 
 			prevSetsRef.current = { team1Sets: t1Sets, team2Sets: t2Sets };
+			prevAdvantageRef.current = nowInAdvantageStage;
 		};
 
 		const onMatchStatus = (m: { id?: string; status?: string; winnerId?: string | null }) => {

@@ -14,12 +14,446 @@ import "../../styles/admin.css";
 
 type Ack<T> = { ok: true; data: T } | { ok: false; error: string };
 
+// ── Scoring presets ─────────────────────────────────────────────────────────
+
+type ScoringPreset = {
+	id: string;
+	name: string;
+	description: string;
+	settings: ScoringSettings;
+};
+
+const SCORING_PRESETS: ScoringPreset[] = [
+	{
+		id: "fixed2x11_totalpoints",
+		name: "2 sety po 11 pkt (punkty decydują)",
+		description:
+			"Zawsze rozgrywane są 2 sety do 11 punktów. Przy wyniku 1:1 o awansie decyduje większa liczba łącznie zdobytych punktów. Jeśli punkty są remisowe – gra się na przewagę (pierwsze 2-punktowe prowadzenie).",
+		settings: {
+			mode: "sets",
+			setsToWin: 2,
+			pointsToWinSet: 11,
+			pointsToWinTieBreak: 15,
+			mustWinByTwo: true,
+			tiebreakByTotalPoints: true
+		}
+	},
+	{
+		id: "classic2x15",
+		name: "Do 2 setów po 15 pkt",
+		description:
+			"Klasyczny system meczowy. Wygrywa drużyna, która pierwsza zdobędzie 2 sety do 15 punktów (z przewagą 2 pkt). Przy 1:1 rozgrywany jest decydujący 3. set.",
+		settings: {
+			mode: "sets",
+			setsToWin: 2,
+			pointsToWinSet: 15,
+			pointsToWinTieBreak: 15,
+			mustWinByTwo: true,
+			tiebreakByTotalPoints: false
+		}
+	},
+	{
+		id: "classic2x25",
+		name: "Do 2 setów po 25 pkt",
+		description:
+			"Standardowe zasady siatkówki. Pierwsza drużyna z 2 wygranymi setami do 25 punktów. Przy 1:1 – decydujący set do 15 pkt.",
+		settings: {
+			mode: "sets",
+			setsToWin: 2,
+			pointsToWinSet: 25,
+			pointsToWinTieBreak: 15,
+			mustWinByTwo: true,
+			tiebreakByTotalPoints: false
+		}
+	},
+	{
+		id: "timed",
+		name: "Na czas",
+		description:
+			"Mecz rozgrywany na czas. Po upływie czasu wygrywa drużyna z większą liczbą punktów. Opcjonalna dogrywka lub złoty gol.",
+		settings: {
+			mode: "timed",
+			setsToWin: 1,
+			pointsToWinSet: 25,
+			pointsToWinTieBreak: 15,
+			mustWinByTwo: false,
+			tiebreakByTotalPoints: false,
+			matchDurationMinutes: 10,
+			overtimeMinutes: 2,
+			goldenGoal: true
+		}
+	},
+	{
+		id: "custom",
+		name: "Własny",
+		description: "Skonfiguruj wszystkie parametry punktacji ręcznie.",
+		settings: {
+			mode: "sets",
+			setsToWin: 2,
+			pointsToWinSet: 25,
+			pointsToWinTieBreak: 15,
+			mustWinByTwo: true,
+			tiebreakByTotalPoints: false,
+			matchDurationMinutes: 10,
+			overtimeMinutes: 2,
+			goldenGoal: true
+		}
+	}
+];
+
+/** Determine which preset id best matches the given settings (or 'custom'). */
+function detectPresetId(settings: ScoringSettings): string {
+	for (const preset of SCORING_PRESETS) {
+		if (preset.id === "custom") continue;
+		const s = preset.settings;
+		if (
+			s.mode === settings.mode &&
+			s.setsToWin === settings.setsToWin &&
+			s.pointsToWinSet === settings.pointsToWinSet &&
+			s.pointsToWinTieBreak === settings.pointsToWinTieBreak &&
+			s.mustWinByTwo === settings.mustWinByTwo &&
+			(s.tiebreakByTotalPoints ?? false) === (settings.tiebreakByTotalPoints ?? false)
+		) {
+			return preset.id;
+		}
+	}
+	return "custom";
+}
+
+// ── ScoringPresetSelector ───────────────────────────────────────────────────
+
+function ScoringPresetSelector({
+	value,
+	onChange
+}: {
+	value: ScoringSettings;
+	onChange: (settings: ScoringSettings) => void;
+}) {
+	const activePresetId = detectPresetId(value);
+
+	const handlePresetClick = (preset: ScoringPreset) => {
+		if (preset.id === "custom") {
+			// Keep current settings but switch to 'custom' display (no-op on settings)
+			// We still call onChange to ensure the parent re-renders with activePresetId=custom
+			onChange({ ...value });
+		} else {
+			onChange({ ...preset.settings });
+		}
+	};
+
+	const updateCustom = (patch: Partial<ScoringSettings>) => {
+		onChange({ ...value, ...patch });
+	};
+
+	return (
+		<>
+			{/* Preset cards */}
+			<div className="scoring-presets">
+				{SCORING_PRESETS.map(preset => (
+					<button
+						key={preset.id}
+						type="button"
+						className={`scoring-preset-card ${activePresetId === preset.id ? "active" : ""}`}
+						onClick={() => handlePresetClick(preset)}
+					>
+						<span className="scoring-preset-name">{preset.name}</span>
+						<span className="scoring-preset-desc">{preset.description}</span>
+					</button>
+				))}
+			</div>
+
+			{/* Custom form (only when 'custom' preset is selected) */}
+			{activePresetId === "custom" && (
+				<div className="custom-scoring-form">
+					<div className="form-group">
+						<label className="form-label">Tryb punktacji</label>
+						<div className="btn-group">
+							<button
+								className={`btn btn-sm ${value.mode === "sets" ? "btn-primary" : "btn-secondary"}`}
+								onClick={() => updateCustom({ mode: "sets" })}
+							>
+								Sety (siatkówka)
+							</button>
+							<button
+								className={`btn btn-sm ${value.mode === "points" ? "btn-primary" : "btn-secondary"}`}
+								onClick={() => updateCustom({ mode: "points" })}
+							>
+								Tylko punkty
+							</button>
+							<button
+								className={`btn btn-sm ${value.mode === "timed" ? "btn-primary" : "btn-secondary"}`}
+								onClick={() => updateCustom({ mode: "timed" })}
+							>
+								Na czas
+							</button>
+						</div>
+					</div>
+
+					{value.mode === "sets" && (
+						<>
+							<div className="form-row">
+								<div className="form-group">
+									<label className="form-label">Sety do wygranej</label>
+									<select
+										className="form-input"
+										value={value.setsToWin}
+										onChange={e => updateCustom({ setsToWin: Number(e.target.value) })}
+									>
+										<option value={1}>1 (do 1 seta)</option>
+										<option value={2}>2 (do 2 setów – best of 3)</option>
+										<option value={3}>3 (do 3 setów – best of 5)</option>
+									</select>
+								</div>
+								<div className="form-group">
+									<label className="form-label">Punkty do wygranej seta</label>
+									<select
+										className="form-input"
+										value={value.pointsToWinSet}
+										onChange={e => updateCustom({ pointsToWinSet: Number(e.target.value) })}
+									>
+										<option value={11}>11 punktów</option>
+										<option value={15}>15 punktów</option>
+										<option value={21}>21 punktów</option>
+										<option value={25}>25 punktów</option>
+									</select>
+								</div>
+							</div>
+
+							<div className="form-row">
+								<div className="form-group">
+									<label className="form-label">Rozstrzygnięcie przy remisie setów</label>
+									<div className="btn-group">
+										<button
+											className={`btn btn-sm ${!value.tiebreakByTotalPoints ? "btn-primary" : "btn-secondary"}`}
+											onClick={() => updateCustom({ tiebreakByTotalPoints: false })}
+										>
+											Decydujący set
+										</button>
+										<button
+											className={`btn btn-sm ${value.tiebreakByTotalPoints ? "btn-primary" : "btn-secondary"}`}
+											onClick={() => updateCustom({ tiebreakByTotalPoints: true })}
+										>
+											Punkty łączne
+										</button>
+									</div>
+									<span className="text-muted text-sm" style={{ marginTop: "0.25rem", display: "block" }}>
+										{value.tiebreakByTotalPoints
+											? "Przy remisie setów: wygrywa drużyna z większą łączną liczbą punktów. Jeśli punkty równe – gra na przewagę."
+											: "Przy remisie setów: rozgrywany jest decydujący (tie-break) set."}
+									</span>
+								</div>
+
+								{!value.tiebreakByTotalPoints && (
+									<div className="form-group">
+										<label className="form-label">Punkty w decydującym secie</label>
+										<select
+											className="form-input"
+											value={value.pointsToWinTieBreak}
+											onChange={e => updateCustom({ pointsToWinTieBreak: Number(e.target.value) })}
+										>
+											<option value={11}>11 punktów</option>
+											<option value={15}>15 punktów</option>
+											<option value={21}>21 punktów</option>
+										</select>
+									</div>
+								)}
+							</div>
+
+							<div className="form-row">
+								<div className="form-group">
+									<label className="form-label">Przewaga 2 punktów</label>
+									<div className="btn-group">
+										<button
+											className={`btn btn-sm ${value.mustWinByTwo ? "btn-primary" : "btn-secondary"}`}
+											onClick={() => updateCustom({ mustWinByTwo: true })}
+										>
+											Tak
+										</button>
+										<button
+											className={`btn btn-sm ${!value.mustWinByTwo ? "btn-primary" : "btn-secondary"}`}
+											onClick={() => updateCustom({ mustWinByTwo: false })}
+										>
+											Nie
+										</button>
+									</div>
+								</div>
+							</div>
+						</>
+					)}
+
+					{value.mode === "timed" && (
+						<>
+							<div className="form-row">
+								<div className="form-group">
+									<label className="form-label">Czas meczu (minuty)</label>
+									<select
+										className="form-input"
+										value={value.matchDurationMinutes ?? 10}
+										onChange={e => updateCustom({ matchDurationMinutes: Number(e.target.value) })}
+									>
+										<option value={5}>5 minut</option>
+										<option value={7}>7 minut</option>
+										<option value={10}>10 minut</option>
+										<option value={15}>15 minut</option>
+										<option value={20}>20 minut</option>
+									</select>
+								</div>
+								<div className="form-group">
+									<label className="form-label">Dogrywka (minuty)</label>
+									<select
+										className="form-input"
+										value={value.overtimeMinutes ?? 2}
+										onChange={e => updateCustom({ overtimeMinutes: Number(e.target.value) })}
+									>
+										<option value={0}>Brak dogrywki</option>
+										<option value={1}>1 minuta</option>
+										<option value={2}>2 minuty</option>
+										<option value={3}>3 minuty</option>
+										<option value={5}>5 minut</option>
+									</select>
+								</div>
+							</div>
+							<div className="form-group">
+								<label className="form-label">Złoty gol (pierwszy punkt w dogrywce wygrywa)</label>
+								<div className="btn-group">
+									<button
+										className={`btn btn-sm ${value.goldenGoal ? "btn-primary" : "btn-secondary"}`}
+										onClick={() => updateCustom({ goldenGoal: true })}
+									>
+										Tak
+									</button>
+									<button
+										className={`btn btn-sm ${!value.goldenGoal ? "btn-primary" : "btn-secondary"}`}
+										onClick={() => updateCustom({ goldenGoal: false })}
+									>
+										Nie
+									</button>
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+			)}
+		</>
+	);
+}
+
+// ── RoundOverridesEditor ────────────────────────────────────────────────────
+
+const ROUND_LABELS: Record<string, string> = {
+	final: "Finał",
+	semifinal: "Półfinały",
+	thirdPlace: "Mecz o 3. miejsce",
+	"1": "Runda 1",
+	"2": "Runda 2",
+	"3": "Runda 3",
+	"4": "Runda 4"
+};
+
+function RoundOverridesEditor({
+	overrides,
+	defaultScoring,
+	onChange
+}: {
+	overrides: RoundScoringOverride[];
+	defaultScoring: ScoringSettings;
+	onChange: (overrides: RoundScoringOverride[]) => void;
+}) {
+	const addOverride = () => {
+		const usedRounds = new Set(overrides.map(o => String(o.round)));
+		// Pick first unused round
+		const candidates = ["final", "semifinal", "thirdPlace", "1", "2", "3", "4"];
+		const round = candidates.find(r => !usedRounds.has(r)) ?? "final";
+		onChange([
+			...overrides,
+			{
+				round: (isNaN(Number(round)) ? round : Number(round)) as RoundScoringOverride["round"],
+				settings: { ...defaultScoring }
+			}
+		]);
+	};
+
+	const removeOverride = (index: number) => onChange(overrides.filter((_, i) => i !== index));
+
+	const updateOverrideRound = (index: number, round: string) => {
+		const next = [...overrides];
+		next[index] = {
+			...next[index],
+			round: (isNaN(Number(round)) ? round : Number(round)) as RoundScoringOverride["round"]
+		};
+		onChange(next);
+	};
+
+	const updateOverrideSettings = (index: number, settings: ScoringSettings) => {
+		const next = [...overrides];
+		next[index] = { ...next[index], settings };
+		onChange(next);
+	};
+
+	return (
+		<>
+			{overrides.length === 0 && (
+				<p className="text-muted text-sm" style={{ marginBottom: "1rem" }}>
+					Brak nadpisań – wszystkie rundy używają ustawień domyślnych.
+				</p>
+			)}
+
+			{overrides.map((override, index) => {
+				const effectiveSettings: ScoringSettings = {
+					...defaultScoring,
+					...override.settings
+				};
+
+				return (
+					<div
+						key={index}
+						className="card"
+						style={{ marginBottom: "1rem", border: "1px solid var(--border-color)" }}
+					>
+						<div className="flex gap-2 items-center" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
+							<select
+								className="form-input"
+								value={String(override.round)}
+								onChange={e => updateOverrideRound(index, e.target.value)}
+								style={{ width: "auto" }}
+							>
+								{Object.entries(ROUND_LABELS).map(([value, label]) => (
+									<option key={value} value={value}>
+										{label}
+									</option>
+								))}
+							</select>
+							<span className="text-muted">→ inne ustawienia punktacji:</span>
+							<button
+								className="btn btn-danger btn-sm"
+								style={{ marginLeft: "auto" }}
+								onClick={() => removeOverride(index)}
+							>
+								Usuń
+							</button>
+						</div>
+
+						<ScoringPresetSelector value={effectiveSettings} onChange={s => updateOverrideSettings(index, s)} />
+					</div>
+				);
+			})}
+
+			<button className="btn btn-secondary" onClick={addOverride}>
+				+ Dodaj nadpisanie dla rundy
+			</button>
+		</>
+	);
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
+
 const DEFAULT_SCORING: ScoringSettings = {
 	mode: "sets",
 	setsToWin: 2,
 	pointsToWinSet: 25,
 	pointsToWinTieBreak: 15,
 	mustWinByTwo: true,
+	tiebreakByTotalPoints: false,
 	matchDurationMinutes: 10,
 	overtimeMinutes: 2,
 	goldenGoal: true
@@ -122,10 +556,6 @@ export function TournamentSetup() {
 		});
 	}, [socket, id, isNew, confirm, addToast, navigate]);
 
-	const updateScoring = (patch: Partial<ScoringSettings>) => {
-		setScoring(prev => ({ ...prev, ...patch }));
-	};
-
 	if (loading) {
 		return (
 			<div className="admin-page">
@@ -204,171 +634,7 @@ export function TournamentSetup() {
 						Te ustawienia będą używane dla wszystkich rund, chyba że zostaną nadpisane poniżej.
 					</span>
 				</div>
-
-				<div className="form-group">
-					<label className="form-label">Tryb punktacji</label>
-					<div className="btn-group">
-						<button
-							className={`btn btn-sm ${scoring.mode === "sets" ? "btn-primary" : "btn-secondary"}`}
-							onClick={() => updateScoring({ mode: "sets" })}
-						>
-							Sety (siatkówka)
-						</button>
-						<button
-							className={`btn btn-sm ${scoring.mode === "points" ? "btn-primary" : "btn-secondary"}`}
-							onClick={() => updateScoring({ mode: "points" })}
-						>
-							Tylko punkty
-						</button>
-						<button
-							className={`btn btn-sm ${scoring.mode === "timed" ? "btn-primary" : "btn-secondary"}`}
-							onClick={() => updateScoring({ mode: "timed" })}
-						>
-							Na czas
-						</button>
-					</div>
-				</div>
-
-				{scoring.mode === "sets" && (
-					<>
-						<div className="form-row">
-							<div className="form-group">
-								<label className="form-label">Sety do wygranej</label>
-								<select
-									className="form-input"
-									value={scoring.setsToWin}
-									onChange={e => updateScoring({ setsToWin: Number(e.target.value) })}
-								>
-									<option value={1}>1 (do 1 seta)</option>
-									<option value={2}>2 (do 2 setów - best of 3)</option>
-									<option value={3}>3 (do 3 setów - best of 5)</option>
-								</select>
-							</div>
-
-							<div className="form-group">
-								<label className="form-label">Punkty do wygranej seta</label>
-								<select
-									className="form-input"
-									value={scoring.pointsToWinSet}
-									onChange={e => updateScoring({ pointsToWinSet: Number(e.target.value) })}
-								>
-									<option value={15}>15 punktów</option>
-									<option value={21}>21 punktów</option>
-									<option value={25}>25 punktów</option>
-								</select>
-							</div>
-						</div>
-
-						<div className="form-row">
-							<div className="form-group">
-								<label className="form-label">Punkty w tie-breaku</label>
-								<select
-									className="form-input"
-									value={scoring.pointsToWinTieBreak}
-									onChange={e => updateScoring({ pointsToWinTieBreak: Number(e.target.value) })}
-								>
-									<option value={11}>11 punktów</option>
-									<option value={15}>15 punktów</option>
-									<option value={21}>21 punktów</option>
-								</select>
-							</div>
-
-							<div className="form-group">
-								<label className="form-label">Przewaga 2 punktów</label>
-								<div className="btn-group">
-									<button
-										className={`btn btn-sm ${scoring.mustWinByTwo ? "btn-primary" : "btn-secondary"}`}
-										onClick={() => updateScoring({ mustWinByTwo: true })}
-									>
-										Tak
-									</button>
-									<button
-										className={`btn btn-sm ${!scoring.mustWinByTwo ? "btn-primary" : "btn-secondary"}`}
-										onClick={() => updateScoring({ mustWinByTwo: false })}
-									>
-										Nie
-									</button>
-								</div>
-							</div>
-						</div>
-
-						<div className="info-message">
-							<strong>Podgląd:</strong> Mecz do {scoring.setsToWin} wygranych setów. Set wygrywa się przy{" "}
-							{scoring.pointsToWinSet} punktach
-							{scoring.mustWinByTwo && " (z przewagą min. 2 pkt)"}.
-							{scoring.setsToWin > 1 &&
-								` Decydujący set (tie-break) rozgrywany jest do ${scoring.pointsToWinTieBreak} punktów.`}
-						</div>
-					</>
-				)}
-
-				{scoring.mode === "points" && (
-					<div className="info-message">
-						<strong>Tryb prosty:</strong> Licznik punktów bez setów. Admin ręcznie kończy mecz i wybiera
-						zwycięzcę.
-					</div>
-				)}
-
-				{scoring.mode === "timed" && (
-					<>
-						<div className="form-row">
-							<div className="form-group">
-								<label className="form-label">Czas meczu (minuty)</label>
-								<select
-									className="form-input"
-									value={scoring.matchDurationMinutes ?? 10}
-									onChange={e => updateScoring({ matchDurationMinutes: Number(e.target.value) })}
-								>
-									<option value={5}>5 minut</option>
-									<option value={7}>7 minut</option>
-									<option value={10}>10 minut</option>
-									<option value={15}>15 minut</option>
-									<option value={20}>20 minut</option>
-								</select>
-							</div>
-
-							<div className="form-group">
-								<label className="form-label">Dogrywka (minuty)</label>
-								<select
-									className="form-input"
-									value={scoring.overtimeMinutes ?? 2}
-									onChange={e => updateScoring({ overtimeMinutes: Number(e.target.value) })}
-								>
-									<option value={0}>Brak dogrywki</option>
-									<option value={1}>1 minuta</option>
-									<option value={2}>2 minuty</option>
-									<option value={3}>3 minuty</option>
-									<option value={5}>5 minut</option>
-								</select>
-							</div>
-						</div>
-
-						<div className="form-group">
-							<label className="form-label">Złoty gol (pierwszy punkt w dogrywce wygrywa)</label>
-							<div className="btn-group">
-								<button
-									className={`btn btn-sm ${scoring.goldenGoal ? "btn-primary" : "btn-secondary"}`}
-									onClick={() => updateScoring({ goldenGoal: true })}
-								>
-									Tak
-								</button>
-								<button
-									className={`btn btn-sm ${!scoring.goldenGoal ? "btn-primary" : "btn-secondary"}`}
-									onClick={() => updateScoring({ goldenGoal: false })}
-								>
-									Nie
-								</button>
-							</div>
-						</div>
-
-						<div className="info-message">
-							<strong>Tryb na czas:</strong> Mecz trwa {scoring.matchDurationMinutes ?? 10} minut.
-							{(scoring.overtimeMinutes ?? 0) > 0
-								? ` Przy remisie - dogrywka ${scoring.overtimeMinutes} min${scoring.goldenGoal ? " (złoty gol)" : ""}.`
-								: " Bez dogrywki - przy remisie admin wybiera zwycięzcę."}
-						</div>
-					</>
-				)}
+				<ScoringPresetSelector value={scoring} onChange={setScoring} />
 			</div>
 
 			{/* Round Overrides */}
@@ -376,140 +642,10 @@ export function TournamentSetup() {
 				<div className="card-header">
 					<h2>Nadpisania dla rund</h2>
 					<span className="text-muted text-sm">
-						Ustaw inne zasady punktacji dla wybranych rund (np. finał na czas).
+						Ustaw inne zasady punktacji dla wybranych rund (np. finały na inny system).
 					</span>
 				</div>
-
-				{roundOverrides.map((override, index) => (
-					<div
-						key={index}
-						className="round-override-row"
-						style={{ padding: "1rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}
-					>
-						<div className="flex gap-2 items-center" style={{ marginBottom: "0.5rem" }}>
-							<select
-								className="form-input"
-								value={override.round}
-								onChange={e => {
-									const newOverrides = [...roundOverrides];
-									newOverrides[index].round = e.target.value as RoundScoringOverride["round"];
-									setRoundOverrides(newOverrides);
-								}}
-								style={{ width: "auto" }}
-							>
-								<option value="final">Finał</option>
-								<option value="semifinal">Półfinały</option>
-								<option value="thirdPlace">Mecz o 3. miejsce</option>
-								<option value={1}>Runda 1</option>
-								<option value={2}>Runda 2</option>
-								<option value={3}>Runda 3</option>
-							</select>
-							<span className="text-muted">→</span>
-							<select
-								className="form-input"
-								value={override.settings.mode ?? scoring.mode}
-								onChange={e => {
-									const newOverrides = [...roundOverrides];
-									newOverrides[index].settings = {
-										...newOverrides[index].settings,
-										mode: e.target.value as ScoringSettings["mode"]
-									};
-									setRoundOverrides(newOverrides);
-								}}
-								style={{ width: "auto" }}
-							>
-								<option value="sets">Sety</option>
-								<option value="points">Punkty</option>
-								<option value="timed">Na czas</option>
-							</select>
-							<button
-								className="btn btn-danger btn-sm"
-								onClick={() => setRoundOverrides(roundOverrides.filter((_, i) => i !== index))}
-							>
-								Usuń
-							</button>
-						</div>
-
-						{(override.settings.mode ?? scoring.mode) === "timed" && (
-							<div className="flex gap-2" style={{ marginTop: "0.5rem" }}>
-								<label className="flex items-center gap-1 text-sm">
-									Czas:
-									<select
-										className="form-input form-input-sm"
-										value={override.settings.matchDurationMinutes ?? scoring.matchDurationMinutes ?? 10}
-										onChange={e => {
-											const newOverrides = [...roundOverrides];
-											newOverrides[index].settings = {
-												...newOverrides[index].settings,
-												matchDurationMinutes: Number(e.target.value)
-											};
-											setRoundOverrides(newOverrides);
-										}}
-										style={{ width: "auto" }}
-									>
-										<option value={5}>5 min</option>
-										<option value={7}>7 min</option>
-										<option value={10}>10 min</option>
-										<option value={15}>15 min</option>
-									</select>
-								</label>
-								<label className="flex items-center gap-1 text-sm">
-									Dogrywka:
-									<select
-										className="form-input form-input-sm"
-										value={override.settings.overtimeMinutes ?? scoring.overtimeMinutes ?? 2}
-										onChange={e => {
-											const newOverrides = [...roundOverrides];
-											newOverrides[index].settings = {
-												...newOverrides[index].settings,
-												overtimeMinutes: Number(e.target.value)
-											};
-											setRoundOverrides(newOverrides);
-										}}
-										style={{ width: "auto" }}
-									>
-										<option value={0}>brak</option>
-										<option value={1}>1 min</option>
-										<option value={2}>2 min</option>
-										<option value={3}>3 min</option>
-									</select>
-								</label>
-							</div>
-						)}
-
-						{(override.settings.mode ?? scoring.mode) === "sets" && (
-							<div className="flex gap-2" style={{ marginTop: "0.5rem" }}>
-								<label className="flex items-center gap-1 text-sm">
-									Sety:
-									<select
-										className="form-input form-input-sm"
-										value={override.settings.setsToWin ?? scoring.setsToWin}
-										onChange={e => {
-											const newOverrides = [...roundOverrides];
-											newOverrides[index].settings = {
-												...newOverrides[index].settings,
-												setsToWin: Number(e.target.value)
-											};
-											setRoundOverrides(newOverrides);
-										}}
-										style={{ width: "auto" }}
-									>
-										<option value={1}>do 1</option>
-										<option value={2}>do 2</option>
-										<option value={3}>do 3</option>
-									</select>
-								</label>
-							</div>
-						)}
-					</div>
-				))}
-
-				<button
-					className="btn btn-secondary"
-					onClick={() => setRoundOverrides([...roundOverrides, { round: "final", settings: { mode: "timed" } }])}
-				>
-					+ Dodaj nadpisanie dla rundy
-				</button>
+				<RoundOverridesEditor overrides={roundOverrides} defaultScoring={scoring} onChange={setRoundOverrides} />
 			</div>
 
 			{/* Actions */}

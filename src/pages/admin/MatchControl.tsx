@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSocket } from "../../socket/context";
 import {
@@ -66,6 +66,36 @@ export function MatchControl() {
 	const isTimedMode = scoringMode === "timed";
 	const matchDuration = (score?.scoringMode as ScoringSettings | undefined)?.matchDurationMinutes ?? 10;
 	const matchDurationSeconds = matchDuration * 60;
+
+	// Tiebreak-by-total-points detection
+	const scoringConfig = score?.scoringMode as ScoringSettings | undefined;
+	const tiebreakByTotalPoints = scoringConfig?.tiebreakByTotalPoints ?? false;
+	const _setsToWin = score?.setsToWin ?? 2;
+	const _completedTotals = score?.setScores?.reduce((acc, s) => ({ t1: acc.t1 + s.t1, t2: acc.t2 + s.t2 }), {
+		t1: 0,
+		t2: 0
+	});
+	const isTotalPointsDecision =
+		tiebreakByTotalPoints &&
+		Math.abs((score?.team1Sets ?? 0) - (score?.team2Sets ?? 0)) === 1 &&
+		Math.max(score?.team1Sets ?? 0, score?.team2Sets ?? 0) === _setsToWin - 1 &&
+		(score?.setScores?.length ?? 0) >= (_setsToWin - 1) * 2 &&
+		(_completedTotals?.t1 ?? 0) === (_completedTotals?.t2 ?? 0);
+	const totalT1 = score?.setScores?.reduce((sum, s) => sum + s.t1, 0) ?? 0;
+	const totalT2 = score?.setScores?.reduce((sum, s) => sum + s.t2, 0) ?? 0;
+
+	// Suggested winner: team that has already met win criteria according to scoring rules.
+	// Used to distinguish a "legitimate" win confirmation from a forced/override one.
+	const suggestedWinnerId = useMemo((): string | null => {
+		if (!match || match.status !== "live" || !score || !scoringMode) return null;
+		if (scoringMode === "sets") {
+			const setsToWin = score.setsToWin ?? 2;
+			if ((score.team1Sets ?? 0) >= setsToWin && match.team1Id) return match.team1Id;
+			if ((score.team2Sets ?? 0) >= setsToWin && match.team2Id) return match.team2Id;
+		}
+		// 'points' and 'timed' modes: no automatic win criteria in the UI
+		return null;
+	}, [match, score, scoringMode]);
 
 	// Timer effect
 	useEffect(() => {
@@ -197,13 +227,9 @@ export function MatchControl() {
 	useEffect(() => {
 		if (!socket || !match?.team1Id || !match?.team2Id) return;
 		type PlayerAck = { ok: true; data: Player[] | null } | { ok: false; error: string };
-		socket.emit(
-			"player:list",
-			{ teamIds: [match.team1Id, match.team2Id] },
-			(ack: PlayerAck) => {
-				if (ack.ok && ack.data) setPlayers(ack.data);
-			}
-		);
+		socket.emit("player:list", { teamIds: [match.team1Id, match.team2Id] }, (ack: PlayerAck) => {
+			if (ack.ok && ack.data) setPlayers(ack.data);
+		});
 	}, [socket, match?.team1Id, match?.team2Id]);
 
 	useEffect(() => {
@@ -330,15 +356,34 @@ export function MatchControl() {
 		setEditingSetIndex(null);
 	};
 
-	// Force winner with confirmation
+	// Force winner with confirmation.
+	// If the team already meets the win criteria (suggestedWinnerId), show a simple
+	// confirmation. Otherwise warn the admin that criteria aren't met.
 	const forceWinner = async (winnerId: string, winnerName: string) => {
 		if (!socket || !tournament || !matchId) return;
-		const confirmed = await confirm({
-			title: "Wymuś zwycięzcę",
-			message: `Czy na pewno chcesz ręcznie ustawić ${winnerName} jako zwycięzcę tego meczu? Mecz zostanie zakończony z aktualnym wynikiem.`,
-			confirmText: "Tak, zakończ mecz",
-			danger: true
-		});
+
+		const isMeetingCriteria = suggestedWinnerId === winnerId;
+
+		let confirmed: boolean;
+		if (isMeetingCriteria) {
+			confirmed = await confirm({
+				title: "Zatwierdź zwycięzcę",
+				message: `Czy chcesz zakończyć mecz i ogłosić ${winnerName} zwycięzcą?`,
+				confirmText: "Zakończ mecz",
+				danger: false
+			});
+		} else {
+			const winnerSets = winnerId === match?.team1Id ? (score?.team1Sets ?? 0) : (score?.team2Sets ?? 0);
+			const setsNeeded = score?.setsToWin ?? 2;
+			const criteriaNote = scoringMode === "sets" ? ` (ma ${winnerSets} z wymaganych ${setsNeeded} setów)` : "";
+			confirmed = await confirm({
+				title: "Wymuś zwycięzcę",
+				message: `${winnerName} nie spełnia jeszcze kryteriów zwycięstwa${criteriaNote}. Czy mimo to chcesz zakończyć mecz i ogłosić ${winnerName} zwycięzcą?`,
+				confirmText: "Tak, wymuś",
+				danger: true
+			});
+		}
+
 		if (!confirmed) return;
 		syncTimer();
 		end(winnerId);
@@ -414,11 +459,7 @@ export function MatchControl() {
 						<span className="text-muted">Runda {match.roundNumber}</span>
 						<span className="text-dim">•</span>
 						<span className={`status-badge ${match.status}`}>
-							{match.status === "pending"
-								? "Oczekuje"
-								: match.status === "live"
-									? "Na żywo"
-									: "Zakończony"}
+							{match.status === "pending" ? "Oczekuje" : match.status === "live" ? "Na żywo" : "Zakończony"}
 						</span>
 						{scoringMode && (
 							<>
@@ -432,9 +473,7 @@ export function MatchControl() {
 				) : (
 					<span className="text-muted">Kontrola meczu</span>
 				)}
-				{match && scoringMode !== "timed" && (
-					<div className="mc-info__right">Set: {score?.currentSet ?? 1}</div>
-				)}
+				{match && scoringMode !== "timed" && <div className="mc-info__right">Set: {score?.currentSet ?? 1}</div>}
 			</div>
 
 			{/* ── Row 2: Sets display OR Timer ── */}
@@ -453,9 +492,7 @@ export function MatchControl() {
 											: undefined
 								}}
 							>
-								{isOvertime
-									? `+${formatTime(localTime - matchDurationSeconds)}`
-									: formatTime(timeRemaining)}
+								{isOvertime ? `+${formatTime(localTime - matchDurationSeconds)}` : formatTime(timeRemaining)}
 							</div>
 							<span className="text-muted" style={{ fontSize: 12 }}>
 								{isOvertime ? "DOGRYWKA" : `z ${matchDuration} min`}
@@ -543,6 +580,31 @@ export function MatchControl() {
 										<span className="text-dim" style={{ marginLeft: 6 }}>
 											({currentSetElapsed})
 										</span>
+									)}
+								</div>
+							)}
+
+							{/* Total-points tiebreak decision banner */}
+							{isTotalPointsDecision && match?.status !== "completed" && (
+								<div
+									className={`info-message ${totalT1 === totalT2 ? "" : "info-message--success"}`}
+									style={{ marginTop: "0.75rem", textAlign: "center" }}
+								>
+									{totalT1 > totalT2 ? (
+										<>
+											<strong>🏆 {t1?.name ?? "Drużyna 1"} wygrywa</strong> na podstawie łącznych
+											punktów ({totalT1} : {totalT2}). Zatwierdź zwycięzcę.
+										</>
+									) : totalT2 > totalT1 ? (
+										<>
+											<strong>🏆 {t2?.name ?? "Drużyna 2"} wygrywa</strong> na podstawie łącznych
+											punktów ({totalT1} : {totalT2}). Zatwierdź zwycięzcę.
+										</>
+									) : (
+										<>
+											<strong>⚡ Remis punktowy</strong> ({totalT1} : {totalT2}) – gramy na przewagę do
+											wyłonienia zwycięzcy!
+										</>
 									)}
 								</div>
 							)}
@@ -672,29 +734,29 @@ export function MatchControl() {
 			</div>
 
 			{/* ── Event Panel (collapsible, between score and footer) ── */}
-		{match && tournament && (
-			<EventPanel
-				matchId={matchId}
-				tournamentId={tournament.id}
-				team1={t1 ? { id: t1.id, name: t1.name, color: t1.color } : undefined}
-				team2={t2 ? { id: t2.id, name: t2.name, color: t2.color } : undefined}
-				currentSet={score?.currentSet ?? 1}
-				scoreSnapshot={{
-					team1Points: score?.team1CurrentPoints ?? 0,
-					team2Points: score?.team2CurrentPoints ?? 0,
-					team1Sets: score?.team1Sets ?? 0,
-					team2Sets: score?.team2Sets ?? 0,
-				}}
-				matchEventsEnabled={true}
-				playerStatsEnabled={false}
-				canScore={!!canScore}
-				players={players}
-			/>
-		)}
+			{match && tournament && (
+				<EventPanel
+					matchId={matchId}
+					tournamentId={tournament.id}
+					team1={t1 ? { id: t1.id, name: t1.name, color: t1.color } : undefined}
+					team2={t2 ? { id: t2.id, name: t2.name, color: t2.color } : undefined}
+					currentSet={score?.currentSet ?? 1}
+					scoreSnapshot={{
+						team1Points: score?.team1CurrentPoints ?? 0,
+						team2Points: score?.team2CurrentPoints ?? 0,
+						team1Sets: score?.team1Sets ?? 0,
+						team2Sets: score?.team2Sets ?? 0
+					}}
+					matchEventsEnabled={true}
+					playerStatsEnabled={false}
+					canScore={!!canScore}
+					players={players}
+				/>
+			)}
 
-		{/* ── Row 4: Footer (set controls + match lifecycle) ── */}
-		{match && (
-			<div className="mc-card mc-footer">
+			{/* ── Row 4: Footer (set controls + match lifecycle) ── */}
+			{match && (
+				<div className="mc-card mc-footer">
 					{/* Manual score save/cancel bar */}
 					{editingScore && (
 						<div className="mc-score__manual-actions">
@@ -743,15 +805,30 @@ export function MatchControl() {
 
 						{match.status === "live" && (
 							<>
+								{/* Suggested winner banner */}
+								{suggestedWinnerId && (
+									<div
+										className="info-message info-message--success"
+										style={{ marginBottom: "0.5rem", textAlign: "center" }}
+									>
+										🏆{" "}
+										<strong>
+											{suggestedWinnerId === match.team1Id
+												? t1?.name || "Drużyna 1"
+												: t2?.name || "Drużyna 2"}
+										</strong>{" "}
+										osiągnął wymaganą liczbę setów – zatwierdź zwycięstwo.
+									</div>
+								)}
 								<button
-									className="btn btn-primary btn-sm mc-win-btn"
+									className={`btn btn-sm mc-win-btn ${suggestedWinnerId === match.team1Id ? "btn-success" : suggestedWinnerId === match.team2Id ? "btn-secondary" : "btn-primary"}`}
 									disabled={!match.team1Id}
 									onClick={() => forceWinner(match.team1Id!, t1?.name || "Drużyna 1")}
 								>
 									🏆 Wygrywa {t1?.name || "Drużyna 1"}
 								</button>
 								<button
-									className="btn btn-primary btn-sm mc-win-btn"
+									className={`btn btn-sm mc-win-btn ${suggestedWinnerId === match.team2Id ? "btn-success" : suggestedWinnerId === match.team1Id ? "btn-secondary" : "btn-primary"}`}
 									disabled={!match.team2Id}
 									onClick={() => forceWinner(match.team2Id!, t2?.name || "Drużyna 2")}
 								>
@@ -778,8 +855,7 @@ export function MatchControl() {
 							<>
 								{match.winnerId && (
 									<span className="text-muted" style={{ fontSize: 13 }}>
-										Zwycięzca:{" "}
-										<strong>{teamLabel(teams.find(t => t.id === match.winnerId))}</strong>
+										Zwycięzca: <strong>{teamLabel(teams.find(t => t.id === match.winnerId))}</strong>
 									</span>
 								)}
 								<button

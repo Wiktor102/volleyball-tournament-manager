@@ -161,9 +161,28 @@ export async function resetMatchScore(
 	const now = Date.now();
 	await ensureMatchScore(matchId, opts?.tournamentId);
 
-	// Get setsToWin from existing score (which was created from tournament settings)
-	const existingScore = await getMatchScore(matchId);
-	const setsToWin = existingScore?.setsToWin ?? 2;
+	// When a tournamentId is provided (e.g. called from startMatch), always re-derive
+	// the authoritative scoring settings from the tournament. This corrects cases where
+	// the score record was previously created by a client subscription (match:score event)
+	// without a tournamentId, causing DEFAULT_SCORING_SETTINGS (25 pts) to be stored
+	// instead of the tournament's actual settings (e.g. 11 pts for fixed2x11_totalpoints).
+	let scoringSettings: ScoringSettings | null = null;
+	if (opts?.tournamentId) {
+		const tournament = await getTournament(opts.tournamentId);
+		if (tournament?.settings) {
+			const match = await getMatch(matchId);
+			const allMatches = await listBracketMatches(opts.tournamentId);
+			const totalRounds = Math.max(...allMatches.filter(m => !m.isThirdPlaceMatch).map(m => m.roundNumber), 1);
+			scoringSettings = getScoringForRound(
+				tournament.settings,
+				match?.roundNumber ?? 1,
+				totalRounds,
+				match?.isThirdPlaceMatch ?? false
+			);
+		}
+	}
+
+	const setsToWin = scoringSettings?.setsToWin ?? (await getMatchScore(matchId))?.setsToWin ?? 2;
 
 	await db
 		.update(matchScores)
@@ -172,6 +191,7 @@ export async function resetMatchScore(
 			team2Sets: 0,
 			currentSet: 1,
 			setsToWin,
+			...(scoringSettings ? { scoringModeJson: JSON.stringify(scoringSettings) } : {}),
 			setScoresJson: serializeSetScoresJson([], opts?.startedAt ?? null),
 			team1CurrentPoints: 0,
 			team2CurrentPoints: 0,
@@ -371,8 +391,54 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 
 	// Volleyball sets mode
 	const setsToWin = config?.setsToWin ?? score.setsToWin ?? 2;
-	const isTieBreak = score.currentSet === setsToWin * 2 - 1; // 5th set in best-of-3 (set 3), or 5th set in best-of-5
-	const pointsToWin = isTieBreak ? (config?.pointsToWinTieBreak ?? 15) : (config?.pointsToWinSet ?? 25);
+	const tiebreakByTotalPoints = config?.tiebreakByTotalPoints ?? false;
+
+	// "Tiebreak set" index (e.g. set 3 for setsToWin=2).
+	// With tiebreakByTotalPoints this set becomes an "advantage set" only if total
+	// points were equal after the regular sets; otherwise the match is resolved
+	// before ever reaching it.
+	const tiebreakSetNumber = setsToWin * 2 - 1;
+	const regularSetCount = tiebreakSetNumber - 1;
+
+	// Sum points from completed sets.
+	const completedTotals = score.setScores.reduce(
+		(acc, s) => {
+			acc.t1 += s.t1;
+			acc.t2 += s.t2;
+			return acc;
+		},
+		{ t1: 0, t2: 0 }
+	);
+
+	// New behavior: when total points are tied after regular sets, continue with an
+	// attached advantage phase that still belongs to the last regular set (no visual
+	// "set 3" jump for the 2x11 total-points preset).
+	// After entering the advantage phase the set that triggered the tie is "un-awarded"
+	// (see the else branch below), so one team ends up at setsToWin-1 sets and the
+	// other at setsToWin-2.  We detect this combination together with tied completedTotals.
+	const isAttachedAdvantagePhase =
+		tiebreakByTotalPoints &&
+		score.currentSet === regularSetCount &&
+		score.setScores.length >= regularSetCount &&
+		Math.abs(score.team1Sets - score.team2Sets) === 1 &&
+		Math.max(score.team1Sets, score.team2Sets) === setsToWin - 1 &&
+		completedTotals.t1 === completedTotals.t2;
+
+	// Detect whether we are currently in the advantage set (only possible when
+	// tiebreakByTotalPoints is active and total points happened to be tied).
+	// Keep legacy detection for already-running matches that may already be in set 3.
+	const isAdvantageSet = isAttachedAdvantagePhase || (tiebreakByTotalPoints && score.currentSet === tiebreakSetNumber);
+
+	// Standard tiebreak set (only when tiebreakByTotalPoints is disabled)
+	const isStandardTieBreak = !tiebreakByTotalPoints && score.currentSet === tiebreakSetNumber;
+
+	// Points required to win the current set
+	const pointsToWin = isAdvantageSet
+		? 1 // advantage set: any single point wins (subject to mustWinByTwo below)
+		: isStandardTieBreak
+			? (config?.pointsToWinTieBreak ?? 15)
+			: (config?.pointsToWinSet ?? 25);
+
 	const minAdvantage = config?.mustWinByTwo ? 2 : 1;
 
 	let t1Points = score.team1CurrentPoints + (team === "team1" ? 1 : 0);
@@ -390,23 +456,92 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 
 	if (isSetWon) {
 		const now = Date.now();
-		// Record set score with duration timestamps
-		setScores.push({
-			t1: t1Points,
-			t2: t2Points,
-			startedAt: currentSetStartedAt,
-			endedAt: now
-		});
+		if (isAttachedAdvantagePhase) {
+			// Resolve attached advantage phase by updating the last regular set's
+			// final score to whatever the running point totals are.  Since t1Points/t2Points
+			// are maintained continuously (they're **not** zeroed when the phase begins),
+			// they represent the cumulative score of that set including all advantage
+			// points.  Simply overwrite the stored set record instead of adding it again.
+			if (setScores.length > 0) {
+				const lastIndex = setScores.length - 1;
+				setScores[lastIndex] = {
+					...setScores[lastIndex],
+					t1: t1Points,
+					t2: t2Points,
+					endedAt: now
+				};
+			}
 
-		// Award set
-		if (team === "team1") t1Sets++;
-		else t2Sets++;
+			// Jump the winning team's set count directly to setsToWin.
+			// During the advantage phase the set that triggered the tie was un-awarded
+			// (one team is at setsToWin-2), so a simple +1 would not reach setsToWin.
+			if (team === "team1") t1Sets = setsToWin;
+			else t2Sets = setsToWin;
 
-		// Reset points for next set, new set starts now
-		t1Points = 0;
-		t2Points = 0;
-		currentSet++;
-		currentSetStartedAt = now;
+			// Do NOT reset points – they continue climbing through the advantage phase
+		} else {
+			// Record set score with duration timestamps
+			setScores.push({
+				t1: t1Points,
+				t2: t2Points,
+				startedAt: currentSetStartedAt,
+				endedAt: now
+			});
+
+			// Award set
+			if (team === "team1") t1Sets++;
+			else t2Sets++;
+
+			// ── tiebreakByTotalPoints resolution ─────────────────────────────────────
+			// After both teams have played (setsToWin - 1) sets each and now they are
+			// still tied in sets (e.g. 1-1 with setsToWin=2), resolve by total points.
+			if (tiebreakByTotalPoints && t1Sets === t2Sets && t1Sets === setsToWin - 1) {
+				const totalT1 = setScores.reduce((sum, s) => sum + s.t1, 0);
+				const totalT2 = setScores.reduce((sum, s) => sum + s.t2, 0);
+
+				if (totalT1 > totalT2) {
+					// team1 wins by total points – award deciding set without extra play
+					t1Sets++;
+					t1Points = 0;
+					t2Points = 0;
+					currentSetStartedAt = now;
+				} else if (totalT2 > totalT1) {
+					// team2 wins by total points – award deciding set without extra play
+					t2Sets++;
+					t1Points = 0;
+					t2Points = 0;
+					currentSetStartedAt = now;
+				} else {
+					// Totals tied: begin an attached advantage phase.
+					// Un-award the set that was just granted to the scoring team so the
+					// scoreboard shows the correct set lead (e.g. 1:0 instead of 1:1).
+					// The advantage phase is detected next time via the asymmetric set
+					// counts + equal completedTotals condition.
+					if (team === "team1") t1Sets--;
+					else t2Sets--;
+					// Do **not** zero out running points; keep them exactly at the last
+					// set's final score so the scoreboard continues from there.
+					// currentSetStartedAt stays unchanged (continuous set duration).
+				}
+			} else {
+				// Standard progression to next set.
+				t1Points = 0;
+				t2Points = 0;
+
+				// Do not advance set counter once the match is already decided.
+				if (t1Sets < setsToWin && t2Sets < setsToWin) {
+					currentSet++;
+				}
+				currentSetStartedAt = now;
+			}
+			// ─────────────────────────────────────────────────────────────────────────
+		}
+	}
+
+	// In total-points tiebreak mode the UI should never progress beyond the last
+	// regular set index (e.g. stay on set 2 for fixed 2x11 mode).
+	if (tiebreakByTotalPoints) {
+		currentSet = Math.min(currentSet, regularSetCount);
 	}
 
 	await db

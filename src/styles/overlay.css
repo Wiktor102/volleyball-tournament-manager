@@ -1603,6 +1603,24 @@ html, body, #root {
 }
 
 /* Score Bug challenge badge */
+.ov-scorebug__badges {
+  display: flex;
+  flex-direction: column;
+}
+
+.ov-scorebug__advantage-badge {
+  padding: 4px 16px;
+  background: rgba(255, 210, 63, 0.16);
+  color: var(--ov-gold);
+  font-family: var(--ov-font-condensed);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: center;
+  animation: ov-advantage-badge-pulse 1.2s ease-in-out infinite;
+}
+
 .ov-scorebug__challenge-badge {
   padding: 4px 16px;
   background: rgba(168, 85, 247, 0.25);
@@ -1613,8 +1631,16 @@ html, body, #root {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   text-align: center;
-  border-radius: 0 0 var(--ov-scorebug-radius) var(--ov-scorebug-radius);
   animation: ov-challenge-badge-pulse 1.5s ease-in-out infinite;
+}
+
+.ov-scorebug__badges > :last-child {
+  border-radius: 0 0 var(--ov-scorebug-radius) var(--ov-scorebug-radius);
+}
+
+@keyframes ov-advantage-badge-pulse {
+  0%, 100% { background: rgba(255, 210, 63, 0.16); }
+  50% { background: rgba(255, 210, 63, 0.28); }
 }
 
 @keyframes ov-challenge-badge-pulse {

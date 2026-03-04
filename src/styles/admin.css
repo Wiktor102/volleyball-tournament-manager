@@ -934,6 +934,12 @@
   margin-top: 12px;
 }
 
+.info-message--success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
 /* Keyboard Shortcuts */
 .keyboard-hint {
   display: inline-flex;
@@ -3248,4 +3254,60 @@
 
 .event-panel__challenge-start-btn:hover {
   filter: brightness(1.15);
+}
+/* ===== Scoring Presets ===== */
+
+.scoring-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.scoring-preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  color: var(--color-text);
+}
+
+.scoring-preset-card:hover {
+  border-color: var(--color-border-light);
+  background: var(--color-surface-hover);
+}
+
+.scoring-preset-card.active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.scoring-preset-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.scoring-preset-card.active .scoring-preset-name {
+  color: var(--color-primary);
+}
+
+.scoring-preset-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.custom-scoring-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
 }
