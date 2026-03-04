@@ -57,7 +57,7 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 	const showChallengeBadge = challenge?.status === "pending";
 
 	return (
-		<>
+		<div className="ov-scorebug-stack">
 			<div className="ov-scorebug">
 				{/* Header bar */}
 				<div className="ov-scorebug__header">
@@ -101,7 +101,7 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 				{/* State badges */}
 				{(isAdvantageStage || showChallengeBadge) && (
 					<div className="ov-scorebug__badges">
-						{isAdvantageStage && <div className="ov-scorebug__advantage-badge">⚡ PRZEWAGA</div>}
+						{isAdvantageStage && <div className="ov-scorebug__advantage-badge">⚡ NA PRZEWAGI</div>}
 						{showChallengeBadge && <div className="ov-scorebug__challenge-badge">CHALLENGE</div>}
 					</div>
 				)}
@@ -111,7 +111,7 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 			{hasSets && setScores.length > 0 && (
 				<SetHistory setScores={setScores} team1Color={team1.color} team2Color={team2.color} />
 			)}
-		</>
+		</div>
 	);
 }
 

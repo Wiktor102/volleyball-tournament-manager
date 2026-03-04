@@ -455,4 +455,4 @@ Completed:
   - Deciding points are merged into set 2 score when the advantage phase resolves
 30. ✅ Overlay behavior during advantage-stage transition
   - Fullscreen "Set Won" celebration is suppressed when a tied-total set transitions into attached advantage stage
-  - Scorebug now shows an explicit `⚡ PRZEWAGA` annotation while advantage stage is active
+  - Scorebug now shows an explicit `⚡ NA PRZEWAGI` annotation while advantage stage is active
