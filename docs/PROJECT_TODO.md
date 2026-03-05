@@ -46,6 +46,10 @@
   - [x] Bye slot handling
   - [x] 3rd place match display
   - [x] Match status controls (start/end/reset)
+  - [x] Bracket View redesign (default accordion rounds + Classic toggle with localStorage persistence)
+  - [x] Round completion summaries, auto-expand unfinished round, expand-all control
+  - [x] Slim horizontal match cards with status pill and winner accent
+  - [x] Admin simplification: only "Kontrola meczu" action in bracket cards
 - [x] Match Control page (/admin/match/:id)
   - [x] Large score display with sets
   - [x] Increment/decrement buttons (A/Q, L/P keyboard shortcuts)
@@ -69,6 +73,9 @@
   - [x] Live result updates
   - [x] Winner highlighting
   - [x] 3rd place match display
+  - [x] New default Bracket View + persisted Classic View toggle
+  - [x] Mobile/tablet UX: sticky tournament/round bar, 44px touch targets, swipe round navigation
+  - [x] Optional desktop tree layout with connector lines for wide screens (>=1440px)
 - [x] NotFound page for invalid routes
 
 ### Phase 6: OBS Streaming Overlay

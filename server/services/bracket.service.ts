@@ -1,6 +1,6 @@
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "../db";
-import { bracketMatches } from "../db/schema";
+import { bracketMatches, matchScores } from "../db/schema";
 import { id } from "../utils/id";
 import { listTeams } from "./team.service";
 
@@ -16,12 +16,35 @@ export type BracketMatch = {
 	status: "pending" | "live" | "completed";
 	isThirdPlaceMatch: boolean;
 	nextMatchId: string | null;
+	score?: {
+		team1Sets: number;
+		team2Sets: number;
+		team1CurrentPoints: number;
+		team2CurrentPoints: number;
+	} | null;
 };
 
 export async function listBracketMatches(tournamentId: string): Promise<BracketMatch[]> {
 	const rows = await db
-		.select()
+		.select({
+			id: bracketMatches.id,
+			tournamentId: bracketMatches.tournamentId,
+			roundNumber: bracketMatches.roundNumber,
+			matchNumber: bracketMatches.matchNumber,
+			positionInRound: bracketMatches.positionInRound,
+			team1Id: bracketMatches.team1Id,
+			team2Id: bracketMatches.team2Id,
+			winnerId: bracketMatches.winnerId,
+			status: bracketMatches.status,
+			isThirdPlaceMatch: bracketMatches.isThirdPlaceMatch,
+			nextMatchId: bracketMatches.nextMatchId,
+			team1Sets: matchScores.team1Sets,
+			team2Sets: matchScores.team2Sets,
+			team1CurrentPoints: matchScores.team1CurrentPoints,
+			team2CurrentPoints: matchScores.team2CurrentPoints
+		})
 		.from(bracketMatches)
+		.leftJoin(matchScores, eq(matchScores.matchId, bracketMatches.id))
 		.where(and(eq(bracketMatches.tournamentId, tournamentId), ne(bracketMatches.roundNumber, 0)));
 	return rows.map(r => ({
 		id: r.id,
@@ -34,7 +57,16 @@ export async function listBracketMatches(tournamentId: string): Promise<BracketM
 		winnerId: r.winnerId ?? null,
 		status: r.status as BracketMatch["status"],
 		isThirdPlaceMatch: !!r.isThirdPlaceMatch,
-		nextMatchId: r.nextMatchId ?? null
+		nextMatchId: r.nextMatchId ?? null,
+		score:
+			r.team1Sets != null
+				? {
+						team1Sets: r.team1Sets,
+						team2Sets: r.team2Sets ?? 0,
+						team1CurrentPoints: r.team1CurrentPoints ?? 0,
+						team2CurrentPoints: r.team2CurrentPoints ?? 0
+					}
+				: null
 	}));
 }
 

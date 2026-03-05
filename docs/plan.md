@@ -669,6 +669,13 @@ When a match event is logged by the admin, the overlay displays a short animated
 - Third-place match automatically created from semifinal losers
 - Manual override: admin can reassign any team to any slot
 - "What-if" preview: see potential future matchups
+- New default "Bracket View": per-round accordion columns with completion summary (`x/y ukończono`)
+- Classic horizontal round columns retained as optional "Classic View" toggle (persisted in `localStorage`)
+- Auto-expand behavior: first unfinished round opens by default and remembers manually expanded rounds
+- Slim match cards: two team rows, right-aligned score, compact status pill, winner accent border
+- Waiting-slot lineage hints for unknown teams (e.g. winner source from previous round)
+- Public UX upgrades: sticky round/tournament bar on mobile/tablet, swipe left/right to change rounds, and optional wide-screen tree connectors (`>=1440px`)
+- Third-place match rendered in its own section below the Final in both views
 
 ### Match Management
 - Pre-match: Teams assigned, waiting to start

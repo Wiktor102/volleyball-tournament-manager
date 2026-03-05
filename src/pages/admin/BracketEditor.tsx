@@ -20,15 +20,59 @@ type BracketMatch = {
 	status: "pending" | "live" | "completed";
 	isThirdPlaceMatch: boolean;
 	nextMatchId: string | null;
+	score: {
+		team1Sets: number;
+		team2Sets: number;
+		team1CurrentPoints: number;
+		team2CurrentPoints: number;
+	} | null;
 };
 
-type MatchAck = { id: string };
+type BracketViewMode = "modern" | "classic";
+
+const ADMIN_BRACKET_VIEW_KEY = "bracket_editor_view_mode";
+const ADMIN_BRACKET_EXPANDED_KEY = "bracket_editor_expanded_rounds";
+
+function readAdminBracketView(): BracketViewMode {
+	try {
+		return localStorage.getItem(ADMIN_BRACKET_VIEW_KEY) === "classic" ? "classic" : "modern";
+	} catch {
+		return "modern";
+	}
+}
+
+function readExpandedRounds(): number[] {
+	try {
+		const raw = localStorage.getItem(ADMIN_BRACKET_EXPANDED_KEY);
+		if (!raw) return [];
+		const parsed = JSON.parse(raw);
+		if (!Array.isArray(parsed)) return [];
+		return parsed.map(v => Number(v)).filter(v => Number.isInteger(v) && v > 0);
+	} catch {
+		return [];
+	}
+}
+
+function getRoundName(round: number, totalRounds: number) {
+	if (round === totalRounds) return "Finał";
+	if (round === totalRounds - 1) return "Półfinały";
+	if (round === totalRounds - 2) return "Ćwierćfinały";
+	return `Runda ${round}`;
+}
+
+function getStatusLabel(status: BracketMatch["status"]) {
+	if (status === "live") return "W TRAKCIE";
+	if (status === "completed") return "ZAKOŃCZONY";
+	return "OCZEKUJE";
+}
 
 export function BracketEditor() {
 	const { socket } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 	const [error, setError] = useState<string | null>(null);
+	const [viewMode, setViewMode] = useState<BracketViewMode>(readAdminBracketView);
+	const [expandedRounds, setExpandedRounds] = useState<number[]>([]);
 	const { addToast } = useToast();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
@@ -88,6 +132,60 @@ export function BracketEditor() {
 
 		return { rounds: roundsList, thirdPlaceMatch: thirdPlace };
 	}, [bracket]);
+
+	const totalRounds = Math.max(...rounds.map(r => r.round), 0);
+
+	const roundCompletion = useMemo(
+		() =>
+			rounds.map(({ round, matches }) => {
+				const completed = matches.filter(m => m.status === "completed").length;
+				const allCompleted = matches.length > 0 && completed === matches.length;
+				const allPending = matches.length > 0 && matches.every(m => m.status === "pending");
+				return { round, completed, total: matches.length, allCompleted, allPending };
+			}),
+		[rounds]
+	);
+
+	const earliestUnfinishedRound = useMemo(() => {
+		for (const { round, matches } of rounds) {
+			if (matches.some(m => m.status !== "completed")) return round;
+		}
+		return rounds[0]?.round ?? null;
+	}, [rounds]);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem(ADMIN_BRACKET_VIEW_KEY, viewMode);
+		} catch {
+			// Ignore storage write errors.
+		}
+	}, [viewMode]);
+
+	useEffect(() => {
+		const available = new Set(rounds.map(r => r.round));
+		if (available.size === 0) {
+			setExpandedRounds([]);
+			return;
+		}
+
+		setExpandedRounds(prev => {
+			const validPrev = prev.filter(round => available.has(round));
+			if (validPrev.length > 0) return validPrev;
+
+			const stored = readExpandedRounds().filter(round => available.has(round));
+			const fallback = earliestUnfinishedRound ?? rounds[0]?.round ?? null;
+			const merged = Array.from(new Set([...(fallback ? [fallback] : []), ...stored]));
+			return merged;
+		});
+	}, [earliestUnfinishedRound, rounds]);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem(ADMIN_BRACKET_EXPANDED_KEY, JSON.stringify(expandedRounds));
+		} catch {
+			// Ignore storage write errors.
+		}
+	}, [expandedRounds]);
 
 	// Compute which teams are already assigned in round 1 (for duplicate prevention)
 	const assignedTeamIds = useMemo(() => {
@@ -209,68 +307,110 @@ export function BracketEditor() {
 		);
 	};
 
-	const start = (matchId: string) => {
-		if (!socket || !tournament) return;
-		setError(null);
-		socket.emit("admin:match:start", { tournamentId: tournament.id, matchId }, (ack: Ack<MatchAck>) => {
-			if (!ack.ok) {
-				setError(ack.error);
-				addToast(ack.error, "error");
-			} else {
-				addToast("Mecz rozpoczęty", "success");
-			}
-		});
+	const allExpanded = rounds.length > 0 && rounds.every(r => expandedRounds.includes(r.round));
+
+	const toggleRoundExpanded = (round: number) => {
+		setExpandedRounds(prev =>
+			prev.includes(round) ? prev.filter(item => item !== round) : [...prev, round].sort((a, b) => a - b)
+		);
 	};
 
-	const end = (matchId: string, winnerId: string) => {
-		if (!socket || !tournament) return;
-		setError(null);
-		socket.emit("admin:match:end", { tournamentId: tournament.id, matchId, winnerId }, (ack: Ack<MatchAck>) => {
-			if (!ack.ok) {
-				setError(ack.error);
-				addToast(ack.error, "error");
-			} else {
-				addToast("Mecz zakończony", "success");
-			}
-		});
+	const toggleExpandAll = () => {
+		if (allExpanded) {
+			setExpandedRounds(earliestUnfinishedRound ? [earliestUnfinishedRound] : []);
+			return;
+		}
+		setExpandedRounds(rounds.map(r => r.round));
 	};
 
-	const reset = async (matchId: string, matchInfo: string) => {
-		if (!socket || !tournament) return;
-		const confirmed = await confirm({
-			title: "Resetuj mecz",
-			message: `Czy na pewno chcesz zresetować mecz ${matchInfo}? Wynik zostanie wyzerowany, a mecz wróci do stanu oczekującego.`,
-			confirmText: "Resetuj",
-			danger: true
-		});
-		if (!confirmed) return;
-		setError(null);
-		socket.emit("admin:match:reset", { tournamentId: tournament.id, matchId }, (ack: Ack<MatchAck>) => {
-			if (!ack.ok) {
-				setError(ack.error);
-				addToast(ack.error, "error");
-			} else {
-				addToast("Mecz zresetowany", "info");
-			}
-		});
+	const getWaitingHint = (match: BracketMatch, slot: "team1" | "team2") => {
+		if (match.roundNumber === 1) return "Nie przypisano drużyny";
+		if (match.isThirdPlaceMatch) {
+			const semifinalRound = Math.max(1, totalRounds - 1);
+			const semifinalIndex = slot === "team1" ? 1 : 2;
+			return `Przegrany R${semifinalRound} #${semifinalIndex}`;
+		}
+		const sourcePosition = slot === "team1" ? match.positionInRound * 2 - 1 : match.positionInRound * 2;
+		return `Zwycięzca R${match.roundNumber - 1} #${sourcePosition}`;
 	};
 
-	const getRoundName = (round: number, totalRounds: number) => {
-		if (round === totalRounds) return "Finał";
-		if (round === totalRounds - 1) return "Półfinały";
-		if (round === totalRounds - 2) return "Ćwierćfinały";
-		return `Runda ${round}`;
+	const getTeamScore = (match: BracketMatch, slot: "team1" | "team2") => {
+		if (!match.score) return "—";
+		const value =
+			match.status === "live"
+				? slot === "team1"
+					? match.score.team1CurrentPoints
+					: match.score.team2CurrentPoints
+				: slot === "team1"
+					? match.score.team1Sets
+					: match.score.team2Sets;
+
+		if (match.status === "pending" && value === 0) return "—";
+		return String(value);
 	};
 
-	const getMatchDescription = (m: BracketMatch) => {
-		const t1 = teams.find(t => t.id === m.team1Id);
-		const t2 = teams.find(t => t.id === m.team2Id);
-		const t1Name = t1?.name || "TBD";
-		const t2Name = t2?.name || "TBD";
-		return `${t1Name} vs ${t2Name}`;
-	};
+	const renderMatchCard = (match: BracketMatch, round: number, isThirdPlace = false) => {
+		const team1 = teams.find(t => t.id === match.team1Id);
+		const team2 = teams.find(t => t.id === match.team2Id);
 
-	const totalRounds = Math.max(...rounds.map(r => r.round), 0);
+		const renderSlot = (slot: "team1" | "team2") => {
+			const isTeam1 = slot === "team1";
+			const team = isTeam1 ? team1 : team2;
+			const teamId = isTeam1 ? match.team1Id : match.team2Id;
+			const teamColor = team?.color || undefined;
+			const isWinner = match.winnerId != null && match.winnerId === teamId;
+			const editable = round === 1 && match.status === "pending";
+
+			return (
+				<div key={slot} className={`bracket-slim-row ${isWinner ? "bracket-slim-row--winner" : ""}`}>
+					<div className="bracket-slim-row__left">
+						{editable ? (
+							<select
+								className="form-select bracket-slim-select"
+								value={teamId ?? ""}
+								onChange={e => assign(match.id, slot, e.target.value ? e.target.value : null)}
+							>
+								<option value="">— Wybierz drużynę —</option>
+								{getAvailableTeams(teamId).map(item => (
+									<option key={item.id} value={item.id}>
+										{teamLabel(item)}
+									</option>
+								))}
+							</select>
+						) : team ? (
+							<span className="bracket-slim-row__team" style={{ color: teamColor }}>
+								{teamLabel(team)}
+							</span>
+						) : (
+							<span className="bracket-slim-row__hint">{getWaitingHint(match, slot)}</span>
+						)}
+					</div>
+					<span className="bracket-slim-row__score">{getTeamScore(match, slot)}</span>
+				</div>
+			);
+		};
+
+		return (
+			<div key={match.id} className={`bracket-slim-card bracket-slim-card--${match.status}`}>
+				<div className="bracket-slim-card__head">
+					<span className="match-number">{isThirdPlace ? "Mecz o 3. miejsce" : `Mecz #${match.matchNumber}`}</span>
+					<span className={`bracket-status-pill bracket-status-pill--${match.status}`}>
+						<span className="bracket-status-pill__dot" />
+						{getStatusLabel(match.status)}
+					</span>
+				</div>
+				<div className="bracket-slim-card__body">
+					{renderSlot("team1")}
+					{renderSlot("team2")}
+				</div>
+				<div className="bracket-slim-card__footer">
+					<Link to={`/admin/match/${match.id}`} className="btn btn-secondary btn-sm">
+						Kontrola meczu
+					</Link>
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<>
@@ -298,6 +438,22 @@ export function BracketEditor() {
 								Wyczyść
 							</button>
 						)}
+						<div className="bracket-view-pill" role="tablist" aria-label="Tryb widoku drabinki">
+							<button
+								type="button"
+								className={`bracket-view-pill__btn ${viewMode === "modern" ? "is-active" : ""}`}
+								onClick={() => setViewMode("modern")}
+							>
+								Bracket View
+							</button>
+							<button
+								type="button"
+								className={`bracket-view-pill__btn ${viewMode === "classic" ? "is-active" : ""}`}
+								onClick={() => setViewMode("classic")}
+							>
+								Classic View
+							</button>
+						</div>
 					</div>
 				</div>
 				{error && <div className="error-message">{error}</div>}
@@ -330,224 +486,67 @@ export function BracketEditor() {
 					</div>
 				</div>
 			) : (
-				<div className="bracket-rounds">
-					{rounds.map(({ round, matches }) => (
-						<div key={round} className="bracket-round">
-							<h3>{getRoundName(round, totalRounds)}</h3>
-							<div className="list">
-								{matches.map(m => {
-									const t1 = teams.find(t => t.id === m.team1Id);
-									const t2 = teams.find(t => t.id === m.team2Id);
-									return (
-										<div key={m.id} className={`match-card ${m.status}`}>
-											<div className="match-card-header">
-												<span className="match-number">Mecz #{m.matchNumber}</span>
-												<span className={`status-badge ${m.status}`}>
-													{m.status === "pending"
-														? "Oczekuje"
-														: m.status === "live"
-															? "Na żywo"
-															: "Zakończony"}
-												</span>
-											</div>
-
-											<div className="match-teams">
-												{round === 1 ? (
-													<select
-														className="form-select"
-														disabled={m.status !== "pending"}
-														value={m.team1Id ?? ""}
-														onChange={e =>
-															assign(m.id, "team1", e.target.value ? e.target.value : null)
-														}
-													>
-														<option value="">— Wybierz drużynę —</option>
-														{getAvailableTeams(m.team1Id).map(t => (
-															<option key={t.id} value={t.id}>
-																{teamLabel(t)}
-															</option>
-														))}
-													</select>
-												) : (
-													<div
-														className={`match-team ${m.winnerId === m.team1Id ? "winner" : ""}`}
-														style={{ color: t1?.color || undefined }}
-													>
-														{teamLabel(t1)}
-													</div>
-												)}
-
-												{round === 1 ? (
-													<select
-														className="form-select"
-														disabled={m.status !== "pending"}
-														value={m.team2Id ?? ""}
-														onChange={e =>
-															assign(m.id, "team2", e.target.value ? e.target.value : null)
-														}
-													>
-														<option value="">— Wybierz drużynę —</option>
-														{getAvailableTeams(m.team2Id).map(t => (
-															<option key={t.id} value={t.id}>
-																{teamLabel(t)}
-															</option>
-														))}
-													</select>
-												) : (
-													<div
-														className={`match-team ${m.winnerId === m.team2Id ? "winner" : ""}`}
-														style={{ color: t2?.color || undefined }}
-													>
-														{teamLabel(t2)}
-													</div>
-												)}
-											</div>
-
-											{m.winnerId && (
-												<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
-													✓ Zwycięzca: {teamLabel(teams.find(t => t.id === m.winnerId))}
-												</div>
-											)}
-
-											<div className="btn-group">
-												<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
-													Kontrola meczu
-												</Link>
-												{m.status === "pending" && m.team1Id && m.team2Id && (
-													<button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
-														Rozpocznij
-													</button>
-												)}
-												{m.status === "live" && (
-													<>
-														<button
-															className="btn btn-primary btn-sm"
-															disabled={!m.team1Id}
-															onClick={() => end(m.id, m.team1Id!)}
-														>
-															Wygrywa {t1?.name || "D1"}
-														</button>
-														<button
-															className="btn btn-primary btn-sm"
-															disabled={!m.team2Id}
-															onClick={() => end(m.id, m.team2Id!)}
-														>
-															Wygrywa {t2?.name || "D2"}
-														</button>
-														<button
-															className="btn btn-danger btn-sm"
-															onClick={() => reset(m.id, getMatchDescription(m))}
-														>
-															Reset
-														</button>
-													</>
-												)}
-												{m.status === "completed" && (
-													<button
-														className="btn btn-secondary btn-sm"
-														onClick={() => reset(m.id, getMatchDescription(m))}
-													>
-														Resetuj mecz
-													</button>
-												)}
-											</div>
-										</div>
-									);
-								})}
-							</div>
+				<div className="bracket-shell bracket-shell--admin">
+					{viewMode === "modern" && rounds.length > 1 && (
+						<div className="bracket-shell__toolbar">
+							<button type="button" className="bracket-expand-link" onClick={toggleExpandAll}>
+								{allExpanded ? "Zwiń wszystkie" : "Rozwiń wszystkie"}
+							</button>
 						</div>
-					))}
+					)}
 
-					{/* 3rd Place Match */}
+					{viewMode === "classic" ? (
+						<div className="bracket-rounds">
+							{rounds.map(({ round, matches }) => (
+								<div key={round} className="bracket-round">
+									<h3>{getRoundName(round, totalRounds)}</h3>
+									<div className="list">{matches.map(match => renderMatchCard(match, round))}</div>
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="bracket-accordion-columns">
+							{rounds.map(({ round, matches }) => {
+								const meta = roundCompletion.find(item => item.round === round);
+								const isExpanded = expandedRounds.includes(round);
+								const completion = `${meta?.completed ?? 0}/${meta?.total ?? matches.length} ukończono`;
+
+								return (
+									<section
+										key={round}
+										className={`bracket-accordion-round ${isExpanded ? "bracket-accordion-round--expanded" : "bracket-accordion-round--collapsed"} ${meta?.allCompleted ? "bracket-accordion-round--completed" : ""} ${meta?.allPending ? "bracket-accordion-round--future" : ""}`}
+									>
+										<button
+											type="button"
+											className="bracket-accordion-round__header"
+											aria-expanded={isExpanded}
+											onClick={() => toggleRoundExpanded(round)}
+										>
+											<div className="bracket-accordion-round__title">
+												<span className="bracket-accordion-round__icon">
+													{meta?.allCompleted ? "✓" : meta?.allPending ? "◷" : "•"}
+												</span>
+												<span>{getRoundName(round, totalRounds)}</span>
+											</div>
+											<div className="bracket-accordion-round__meta">{matches.length} mecz(e)</div>
+											<div className="bracket-accordion-round__summary">{completion}</div>
+										</button>
+										{isExpanded && (
+											<div className="list bracket-accordion-round__matches">
+												{matches.map(match => renderMatchCard(match, round))}
+											</div>
+										)}
+									</section>
+								);
+							})}
+						</div>
+					)}
+
 					{thirdPlaceMatch && (
-						<div className="bracket-round">
+						<section className="bracket-third-place-section">
 							<h3>🥉 Mecz o 3. miejsce</h3>
-							<div className="list">
-								{(() => {
-									const m = thirdPlaceMatch;
-									const t1 = teams.find(t => t.id === m.team1Id);
-									const t2 = teams.find(t => t.id === m.team2Id);
-									return (
-										<div key={m.id} className={`match-card ${m.status}`}>
-											<div className="match-card-header">
-												<span className="match-number">O 3. miejsce</span>
-												<span className={`status-badge ${m.status}`}>
-													{m.status === "pending"
-														? "Oczekuje"
-														: m.status === "live"
-															? "Na żywo"
-															: "Zakończony"}
-												</span>
-											</div>
-
-											<div className="match-teams">
-												<div
-													className={`match-team ${m.winnerId === m.team1Id ? "winner" : ""}`}
-													style={{ color: t1?.color || undefined }}
-												>
-													{teamLabel(t1)}
-												</div>
-												<div
-													className={`match-team ${m.winnerId === m.team2Id ? "winner" : ""}`}
-													style={{ color: t2?.color || undefined }}
-												>
-													{teamLabel(t2)}
-												</div>
-											</div>
-
-											{m.winnerId && (
-												<div className="text-dim" style={{ fontSize: 13, marginBottom: 12 }}>
-													🥉 3. miejsce: {teamLabel(teams.find(t => t.id === m.winnerId))}
-												</div>
-											)}
-
-											<div className="btn-group">
-												<Link to={`/admin/match/${m.id}`} className="btn btn-secondary btn-sm">
-													Kontrola meczu
-												</Link>
-												{m.status === "pending" && m.team1Id && m.team2Id && (
-													<button className="btn btn-success btn-sm" onClick={() => start(m.id)}>
-														Rozpocznij
-													</button>
-												)}
-												{m.status === "live" && (
-													<>
-														<button
-															className="btn btn-primary btn-sm"
-															disabled={!m.team1Id}
-															onClick={() => end(m.id, m.team1Id!)}
-														>
-															Wygrywa {t1?.name || "D1"}
-														</button>
-														<button
-															className="btn btn-primary btn-sm"
-															disabled={!m.team2Id}
-															onClick={() => end(m.id, m.team2Id!)}
-														>
-															Wygrywa {t2?.name || "D2"}
-														</button>
-														<button
-															className="btn btn-danger btn-sm"
-															onClick={() => reset(m.id, getMatchDescription(m))}
-														>
-															Reset
-														</button>
-													</>
-												)}
-												{m.status === "completed" && (
-													<button
-														className="btn btn-secondary btn-sm"
-														onClick={() => reset(m.id, getMatchDescription(m))}
-													>
-														Resetuj mecz
-													</button>
-												)}
-											</div>
-										</div>
-									);
-								})()}
-							</div>
-						</div>
+							{renderMatchCard(thirdPlaceMatch, thirdPlaceMatch.roundNumber, true)}
+						</section>
 					)}
 				</div>
 			)}
