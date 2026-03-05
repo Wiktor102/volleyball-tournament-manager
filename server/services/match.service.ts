@@ -271,67 +271,105 @@ export async function endMatch(tournamentId: string, matchId: string, winnerId: 
 			.where(eq(bracketMatches.id, m.nextMatchId));
 	}
 
-	// Check if this was a semifinal and if we should create 3rd place match
-	await maybeCreateThirdPlaceMatch(tournamentId, m, loserId);
+	// If this was a semifinal, feed its loser into the dedicated 3rd-place match.
+	await maybeUpsertThirdPlaceMatch(tournamentId, m, loserId);
 
 	const updated = await getMatch(matchId);
 	if (!updated) return { ok: false as const, error: "Nie udało się zakończyć meczu" };
 	return { ok: true as const, match: updated };
 }
 
-async function maybeCreateThirdPlaceMatch(tournamentId: string, completedMatch: Match, loserId: string | null) {
+function getSemifinalSlot(match: Match, regularMatches: Match[]): "team1Id" | "team2Id" | null {
+	if (regularMatches.length === 0) return null;
+
+	const maxRound = Math.max(...regularMatches.map(m => m.roundNumber));
+	const semifinalRound = maxRound - 1;
+	if (semifinalRound < 1 || match.roundNumber !== semifinalRound) return null;
+
+	const semifinals = regularMatches
+		.filter(m => m.roundNumber === semifinalRound)
+		.sort((a, b) => a.positionInRound - b.positionInRound);
+	if (semifinals.length !== 2) return null;
+
+	const semifinalIndex = semifinals.findIndex(m => m.id === match.id);
+	if (semifinalIndex === -1) return null;
+
+	return semifinalIndex === 0 ? "team1Id" : "team2Id";
+}
+
+async function maybeUpsertThirdPlaceMatch(tournamentId: string, completedMatch: Match, loserId: string | null) {
 	if (!loserId) return;
 
 	const allMatches = await listBracketMatches(tournamentId);
-
-	// Find the final (highest round number, not 3rd place)
 	const regularMatches = allMatches.filter(m => !m.isThirdPlaceMatch);
-	if (regularMatches.length === 0) return;
+	const slot = getSemifinalSlot(completedMatch, regularMatches);
+	if (!slot) return;
 
 	const maxRound = Math.max(...regularMatches.map(m => m.roundNumber));
-
-	// Check if this match is a semifinal (round before final)
 	const semifinalRound = maxRound - 1;
-	if (completedMatch.roundNumber !== semifinalRound || semifinalRound < 1) return;
-
-	// Check if 3rd place match already exists
-	const existingThirdPlace = allMatches.find(m => m.isThirdPlaceMatch);
-	if (existingThirdPlace) {
-		// Update the existing 3rd place match with the loser
-		const position = completedMatch.positionInRound % 2 === 1 ? "team1Id" : "team2Id";
-		const patch = position === "team1Id" ? { team1Id: loserId } : { team2Id: loserId };
-		await db
-			.update(bracketMatches)
-			.set({ ...patch, updatedAt: Date.now() })
-			.where(eq(bracketMatches.id, existingThirdPlace.id));
-		return;
-	}
-
-	// Get both semifinals
-	const semifinals = regularMatches.filter(m => m.roundNumber === semifinalRound);
+	const semifinals = regularMatches
+		.filter(m => m.roundNumber === semifinalRound)
+		.sort((a, b) => a.positionInRound - b.positionInRound);
 	if (semifinals.length !== 2) return;
 
-	// Create 3rd place match only after first semifinal completes
-	// (the second loser will be added when their semifinal ends)
-	const now = Date.now();
-	const thirdPlaceId = id("m");
+	// If a semifinal is effectively a bye (missing one side), there is no valid
+	// pair of semifinal losers to play a 3rd-place match.
+	if (semifinals.some(s => !s.team1Id || !s.team2Id)) return;
 
-	await db.insert(bracketMatches).values({
-		id: thirdPlaceId,
-		tournamentId,
-		roundNumber: maxRound, // Same round as final for display purposes
-		matchNumber: 0, // Special match number for 3rd place
-		positionInRound: 0,
-		team1Id: loserId,
-		team2Id: null, // Will be filled when second semifinal ends
-		winnerId: null,
-		status: "pending",
-		isThirdPlaceMatch: true,
-		nextMatchId: null,
-		scheduledTime: null,
-		createdAt: now,
-		updatedAt: now
-	});
+	const semifinalLoser = (m: Match): string | null => {
+		if (!m.winnerId) return null;
+		return m.winnerId === m.team1Id ? m.team2Id : m.team1Id;
+	};
+
+	const team1LoserId = semifinalLoser(semifinals[0]);
+	const team2LoserId = semifinalLoser(semifinals[1]);
+
+	let thirdPlace = allMatches.find(m => m.isThirdPlaceMatch) ?? null;
+
+	// Backward compatibility for brackets generated before a dedicated
+	// third-place node was created during bracket generation.
+	if (!thirdPlace) {
+		const now = Date.now();
+		const thirdPlaceId = id("m");
+
+		await db.insert(bracketMatches).values({
+			id: thirdPlaceId,
+			tournamentId,
+			roundNumber: maxRound,
+			matchNumber: 0,
+			positionInRound: 0,
+			team1Id: null,
+			team2Id: null,
+			winnerId: null,
+			status: "pending",
+			isThirdPlaceMatch: true,
+			nextMatchId: null,
+			scheduledTime: null,
+			createdAt: now,
+			updatedAt: now
+		});
+
+		thirdPlace = {
+			id: thirdPlaceId,
+			tournamentId,
+			roundNumber: maxRound,
+			matchNumber: 0,
+			positionInRound: 0,
+			team1Id: null,
+			team2Id: null,
+			winnerId: null,
+			status: "pending",
+			isThirdPlaceMatch: true,
+			nextMatchId: null
+		};
+	}
+
+	if (thirdPlace.status !== "pending") return;
+
+	await db
+		.update(bracketMatches)
+		.set({ team1Id: team1LoserId, team2Id: team2LoserId, updatedAt: Date.now() })
+		.where(eq(bracketMatches.id, thirdPlace.id));
 }
 
 export async function resetMatch(tournamentId: string, matchId: string) {
@@ -340,6 +378,15 @@ export async function resetMatch(tournamentId: string, matchId: string) {
 	const m = await getMatch(matchId);
 	if (!m || m.tournamentId !== tournamentId) return { ok: false as const, error: "Nie znaleziono meczu" };
 	if (m.status === "pending") return { ok: true as const, match: m };
+
+	const allMatches = await listBracketMatches(tournamentId);
+	const regularMatches = allMatches.filter(match => !match.isThirdPlaceMatch);
+	const semifinalSlot = getSemifinalSlot(m, regularMatches);
+	const thirdPlace = allMatches.find(match => match.isThirdPlaceMatch) ?? null;
+
+	if (semifinalSlot && thirdPlace && thirdPlace.status !== "pending") {
+		return { ok: false as const, error: "Nie można resetować po rozpoczęciu meczu o 3. miejsce" };
+	}
 
 	if (m.nextMatchId) {
 		const next = await getMatch(m.nextMatchId);
@@ -355,6 +402,19 @@ export async function resetMatch(tournamentId: string, matchId: string) {
 				.update(bracketMatches)
 				.set({ ...patch, updatedAt: now })
 				.where(and(eq(bracketMatches.id, m.nextMatchId), guard));
+		}
+	}
+
+	if (semifinalSlot && thirdPlace) {
+		const loserId = m.winnerId ? (m.winnerId === m.team1Id ? m.team2Id : m.team1Id) : null;
+		if (loserId) {
+			const guard =
+				semifinalSlot === "team1Id" ? eq(bracketMatches.team1Id, loserId) : eq(bracketMatches.team2Id, loserId);
+			const patch = semifinalSlot === "team1Id" ? { team1Id: null } : { team2Id: null };
+			await db
+				.update(bracketMatches)
+				.set({ ...patch, updatedAt: now })
+				.where(and(eq(bracketMatches.id, thirdPlace.id), guard));
 		}
 	}
 
