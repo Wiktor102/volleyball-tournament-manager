@@ -8,7 +8,7 @@ import {
 	type TournamentState,
 	type ScoringSettings
 } from "../../stores/tournament.store";
-import type { MatchScore } from "../../stores/match.store";
+import { useMatchStore, type MatchScore, type ChallengeState } from "../../stores/match.store";
 import { useToast } from "../../components/Toast";
 import { useConfirm } from "../../components/ConfirmModal";
 import { EventPanel } from "../../components/match/EventPanel";
@@ -38,6 +38,8 @@ export function MatchControl() {
 
 	const { socket } = useSocket();
 	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
+	const challenge = useMatchStore(state => state.challenge);
+	const setChallenge = useMatchStore(state => state.setChallenge);
 	const { addToast } = useToast();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
@@ -254,6 +256,40 @@ export function MatchControl() {
 			socket.off("match:score", onScore);
 		};
 	}, [socket, matchId]);
+
+	useEffect(() => {
+		if (!socket || !matchId) {
+			setChallenge(null);
+			return;
+		}
+
+		const syncChallenge = () => {
+			socket.emit("match:challenge:get", { matchId }, (ack: Ack<ChallengeState>) => {
+				if (!ack.ok) {
+					setChallenge(null);
+					return;
+				}
+				setChallenge(ack.data);
+			});
+		};
+
+		syncChallenge();
+
+		const onChallenge = (nextChallenge: ChallengeState) => {
+			if (!nextChallenge) {
+				syncChallenge();
+				return;
+			}
+			if (nextChallenge.matchId !== matchId) return;
+			setChallenge(nextChallenge);
+		};
+
+		socket.on("match:challenge", onChallenge);
+
+		return () => {
+			socket.off("match:challenge", onChallenge);
+		};
+	}, [socket, matchId, setChallenge]);
 
 	const inc = (team: "team1" | "team2") => {
 		if (!socket || !matchId) return;
@@ -787,6 +823,33 @@ export function MatchControl() {
 			{/* ── Row 4: Footer (set controls + match lifecycle) ── */}
 			{match && (
 				<div className="mc-card mc-footer">
+					{challenge?.status === "pending" && (
+						<div className="event-panel__challenge-pending" style={{ marginBottom: "0.75rem" }}>
+							<div className="event-panel__challenge-info">
+								<span className="event-panel__challenge-icon">⚡</span>
+								<span className="event-panel__challenge-label">
+									CHALLENGE —{" "}
+									<span
+										style={{
+											color:
+												challenge.team === "team1"
+													? (t1?.color ?? undefined)
+													: (t2?.color ?? undefined)
+										}}
+									>
+										{challenge.team === "team1" ? (t1?.name ?? "D1") : (t2?.name ?? "D2")}
+									</span>
+								</span>
+								{challenge.reason && (
+									<span className="event-panel__challenge-reason">{challenge.reason}</span>
+								)}
+							</div>
+							<p className="text-muted" style={{ margin: 0, fontSize: 12 }}>
+								Ustaw wynik challenge, aby zaktualizować overlay OBS.
+							</p>
+						</div>
+					)}
+
 					{/* Manual score save/cancel bar */}
 					{editingScore && (
 						<div className="mc-score__manual-actions">

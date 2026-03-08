@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import type { ChallengeState } from "../../stores/match.store";
 
 interface ChallengeOverlayProps {
@@ -7,46 +7,7 @@ interface ChallengeOverlayProps {
 	team2: { name: string; color?: string | null } | undefined;
 }
 
-type Phase = "enter" | "pending" | "resolve-enter" | "resolved" | "exit";
-
 export function ChallengeOverlay({ challenge, team1, team2 }: ChallengeOverlayProps) {
-	const [phase, setPhase] = useState<Phase>("enter");
-	const [prevStatus, setPrevStatus] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!challenge) {
-			setPhase("exit");
-			return;
-		}
-
-		if (challenge.status === "pending" && prevStatus !== "pending") {
-			setPhase("enter");
-			const t = setTimeout(() => setPhase("pending"), 800);
-			setPrevStatus("pending");
-			return () => clearTimeout(t);
-		}
-
-		if ((challenge.status === "successful" || challenge.status === "failed") && prevStatus === "pending") {
-			setPhase("resolve-enter");
-			const t = setTimeout(() => setPhase("resolved"), 600);
-			setPrevStatus(challenge.status);
-			return () => clearTimeout(t);
-		}
-
-		setPrevStatus(challenge.status);
-	}, [challenge, prevStatus]);
-
-	// Don't render when fully gone
-	if (!challenge && phase !== "exit") return null;
-	if (phase === "exit") {
-		// Brief exit animation then unmount
-		return (
-			<div className="ov-challenge ov-challenge--exit">
-				<div className="ov-challenge__vignette" />
-			</div>
-		);
-	}
-
 	if (!challenge) return null;
 
 	const teamName = challenge.team === "team1" ? (team1?.name ?? "Druzyna 1") : (team2?.name ?? "Druzyna 2");
@@ -63,7 +24,7 @@ export function ChallengeOverlay({ challenge, team1, team2 }: ChallengeOverlayPr
 				{
 					"--ov-challenge-team-color": teamColor,
 					"--ov-challenge-result-color": isResolved ? resultColor : undefined
-				} as React.CSSProperties
+				} as CSSProperties
 			}
 		>
 			{/* Dark vignette background */}
@@ -74,7 +35,7 @@ export function ChallengeOverlay({ challenge, team1, team2 }: ChallengeOverlayPr
 
 			{/* Main content */}
 			<div
-				className={`ov-challenge__content ${phase === "enter" ? "ov-challenge__content--enter" : ""} ${phase === "resolve-enter" ? "ov-challenge__content--resolve-enter" : ""}`}
+				className={`ov-challenge__content ${isPending ? "ov-challenge__content--enter" : ""} ${isResolved ? "ov-challenge__content--resolve-enter" : ""}`}
 			>
 				{isPending && (
 					<>

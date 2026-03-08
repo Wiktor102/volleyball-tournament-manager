@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "../../socket/context";
 import { useToast } from "../Toast";
-import { useMatchStore } from "../../stores/match.store";
+import { useMatchStore, type ChallengeState } from "../../stores/match.store";
+
+type Ack<T> = { ok: true; data: T | null } | { ok: false; error: string };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +87,7 @@ export function EventPanel({
 
 	// Challenge state
 	const challenge = useMatchStore(s => s.challenge);
+	const setChallenge = useMatchStore(s => s.setChallenge);
 	const [challengeStartTeam, setChallengeStartTeam] = useState<"team1" | "team2" | null>(null);
 	const [challengeReason, setChallengeReason] = useState("");
 
@@ -184,22 +187,38 @@ export function EventPanel({
 	const startChallenge = useCallback(
 		(team: "team1" | "team2", reason?: string) => {
 			if (!socket || !canScore) return;
-			socket.emit("admin:challenge:start", { matchId, team, reason: reason || undefined });
-			setChallengeStartTeam(null);
-			setChallengeReason("");
-			const teamName = team === "team1" ? (team1?.name ?? "D1") : (team2?.name ?? "D2");
-			addToast(`⚡ Challenge — ${teamName}`, "info");
+			socket.emit(
+				"admin:challenge:start",
+				{ matchId, team, reason: reason || undefined },
+				(ack: Ack<Exclude<ChallengeState, null>>) => {
+					if (!ack.ok) {
+						addToast(ack.error, "error");
+						return;
+					}
+					setChallenge(ack.data);
+					setChallengeStartTeam(null);
+					setChallengeReason("");
+					const teamName = team === "team1" ? (team1?.name ?? "D1") : (team2?.name ?? "D2");
+					addToast(`⚡ Challenge — ${teamName}`, "info");
+				}
+			);
 		},
-		[socket, canScore, matchId, team1, team2, addToast]
+		[socket, canScore, matchId, team1, team2, addToast, setChallenge]
 	);
 
 	const resolveChallenge = useCallback(
 		(result: "successful" | "failed") => {
 			if (!socket) return;
-			socket.emit("admin:challenge:resolve", { matchId, result });
-			addToast(result === "successful" ? "Challenge udany" : "Challenge nieudany", "info");
+			socket.emit("admin:challenge:resolve", { matchId, result }, (ack: Ack<Exclude<ChallengeState, null>>) => {
+				if (!ack.ok) {
+					addToast(ack.error, "error");
+					return;
+				}
+				setChallenge(ack.data);
+				addToast(result === "successful" ? "Challenge udany" : "Challenge nieudany", "info");
+			});
 		},
-		[socket, matchId, addToast]
+		[socket, matchId, addToast, setChallenge]
 	);
 
 	// ── Player picker flow ────────────────────────────────────────────────────
@@ -223,6 +242,7 @@ export function EventPanel({
 
 	if (!matchEventsEnabled) return null;
 
+	const expanded = isExpanded || challenge?.status === "pending";
 	const lastEvent = recentEvents[recentEvents.length - 1];
 
 	const teamNameForEvent = (ev: MatchEvent) => {
@@ -251,15 +271,15 @@ export function EventPanel({
 			{/* Toggle header */}
 			<button
 				className="event-panel__toggle"
-				onClick={() => setIsExpanded(v => !v)}
+				onClick={() => setIsExpanded(v => !(v || challenge?.status === "pending"))}
 				type="button"
-				aria-expanded={isExpanded}
+				aria-expanded={expanded}
 			>
 				<span className="event-panel__toggle-label">
-					<span className="event-panel__toggle-icon">{isExpanded ? "▾" : "▸"}</span>
+					<span className="event-panel__toggle-icon">{expanded ? "▾" : "▸"}</span>
 					Zdarzenia
 				</span>
-				{lastEvent && !isExpanded && (
+				{lastEvent && !expanded && (
 					<span className="event-panel__last-preview">
 						{eventLabel(lastEvent)} · {teamNameForEvent(lastEvent)}
 					</span>
@@ -267,7 +287,7 @@ export function EventPanel({
 			</button>
 
 			{/* Collapsible content */}
-			{isExpanded && (
+			{expanded && (
 				<div className="event-panel__content">
 					{/* Challenge pending banner */}
 					{challenge?.status === "pending" && (

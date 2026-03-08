@@ -109,7 +109,25 @@ export function useTournamentDisplay() {
 
 		const onMatchScore = (s: MatchScore) => setScore(s);
 
-		const onChallenge = (c: ChallengeState) => setChallenge(c);
+		const onChallenge = (c: ChallengeState) => {
+			if (!c) {
+				if (!matchId) {
+					setChallenge(null);
+					return;
+				}
+				socket.emit("match:challenge:get", { matchId }, (ack: Ack<ChallengeState>) => {
+					if (!ack.ok) {
+						setChallenge(null);
+						return;
+					}
+					setChallenge(ack.data);
+				});
+				return;
+			}
+
+			if (c.matchId !== matchId) return;
+			setChallenge(c);
+		};
 
 		socket.on("tournament:state", onState);
 		socket.on("tournament:updated", onTournamentUpdated);
@@ -137,7 +155,8 @@ export function useTournamentDisplay() {
 		setNextMatch,
 		setTotalMatches,
 		setCompletedMatches,
-		setChallenge
+		setChallenge,
+		matchId
 	]);
 
 	// Fetch current score whenever the active match changes

@@ -26,6 +26,7 @@ import {
 	updateMatchTime
 } from "../../services/match.service";
 import { listBracketMatches } from "../../services/bracket.service";
+import { clearChallengeState } from "./challenge";
 
 export function registerMatchHandlers(io: Server, socket: Socket) {
 	socket.on("match:score", async (payload, ack) => {
@@ -123,6 +124,8 @@ export function registerMatchHandlers(io: Server, socket: Socket) {
 		const res = await endMatch(parsed.data.tournamentId, parsed.data.matchId, parsed.data.winnerId);
 		if (!res.ok) return ack?.({ ok: false, error: res.error });
 
+		clearChallengeState(io, parsed.data.matchId);
+
 		io.to(`tournament:${parsed.data.tournamentId}`).emit("match:status", res.match);
 
 		const bracket = await listBracketMatches(parsed.data.tournamentId);
@@ -140,6 +143,8 @@ export function registerMatchHandlers(io: Server, socket: Socket) {
 
 		const res = await resetMatch(parsed.data.tournamentId, parsed.data.matchId);
 		if (!res.ok) return ack?.({ ok: false, error: res.error });
+
+		clearChallengeState(io, parsed.data.matchId);
 
 		io.to(`tournament:${parsed.data.tournamentId}`).emit("match:status", res.match);
 

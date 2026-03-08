@@ -11,6 +11,22 @@ export type ChallengeState = {
 
 // In-memory challenge state, keyed by matchId
 const activeChallenges = new Map<string, ChallengeState>();
+const clearTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelPendingClear(matchId: string) {
+	const timer = clearTimers.get(matchId);
+	if (!timer) return;
+	clearTimeout(timer);
+	clearTimers.delete(matchId);
+}
+
+export function clearChallengeState(io: Server, matchId: string) {
+	cancelPendingClear(matchId);
+	const hadChallenge = activeChallenges.delete(matchId);
+	if (hadChallenge) {
+		io.to(`match:${matchId}`).emit("match:challenge", null);
+	}
+}
 
 export function getChallengeState(matchId: string): ChallengeState | null {
 	return activeChallenges.get(matchId) ?? null;
@@ -20,6 +36,8 @@ export function registerChallengeHandlers(io: Server, socket: Socket) {
 	socket.on("admin:challenge:start", (payload, ack) => {
 		const parsed = ChallengeStartSchema.safeParse(payload);
 		if (!parsed.success) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
+
+		cancelPendingClear(parsed.data.matchId);
 
 		const state: ChallengeState = {
 			matchId: parsed.data.matchId,
@@ -50,10 +68,13 @@ export function registerChallengeHandlers(io: Server, socket: Socket) {
 		io.to(`match:${parsed.data.matchId}`).emit("match:challenge", resolved);
 
 		// Auto-clear after delay so overlay can show the result animation
-		setTimeout(() => {
+		cancelPendingClear(parsed.data.matchId);
+		const timer = setTimeout(() => {
+			clearTimers.delete(parsed.data.matchId);
 			activeChallenges.delete(parsed.data.matchId);
 			io.to(`match:${parsed.data.matchId}`).emit("match:challenge", null);
 		}, 8000);
+		clearTimers.set(parsed.data.matchId, timer);
 
 		return ack?.({ ok: true, data: resolved });
 	});
