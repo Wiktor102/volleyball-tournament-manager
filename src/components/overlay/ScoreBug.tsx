@@ -9,6 +9,7 @@ interface ScoreBugProps {
 	tournamentName: string;
 	matchLabel?: string;
 	challenge?: ChallengeState;
+	showHistory?: boolean;
 }
 
 function isAttachedAdvantageStage(score: MatchScore): boolean {
@@ -33,7 +34,15 @@ function isAttachedAdvantageStage(score: MatchScore): boolean {
 	);
 }
 
-export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, challenge }: ScoreBugProps) {
+export function ScoreBug({
+	team1,
+	team2,
+	score,
+	tournamentName,
+	matchLabel,
+	challenge,
+	showHistory = true
+}: ScoreBugProps) {
 	const t1PointsRef = useRef<HTMLDivElement>(null);
 	const t2PointsRef = useRef<HTMLDivElement>(null);
 	const prevRef = useRef<{ t1: number; t2: number } | null>(null);
@@ -108,7 +117,7 @@ export function ScoreBug({ team1, team2, score, tournamentName, matchLabel, chal
 			</div>
 
 			{/* Set history below scorebug */}
-			{hasSets && setScores.length > 0 && (
+			{hasSets && setScores.length > 0 && showHistory && (
 				<SetHistory setScores={setScores} team1Color={team1.color} team2Color={team2.color} />
 			)}
 		</div>

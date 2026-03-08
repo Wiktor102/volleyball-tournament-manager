@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useTournamentDisplay } from "../../hooks/useTournamentDisplay";
 import { ScoreBug } from "../../components/overlay/ScoreBug";
 import { EventBlast } from "../../components/overlay/EventBlast";
@@ -21,6 +22,22 @@ export function StreamOverlay() {
 		recentMatches,
 		isConnected
 	} = useTournamentDisplay();
+
+	const [showSetHistory, setShowSetHistory] = useState(true);
+	const [showLowerThird, setShowLowerThird] = useState(true);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key.toLowerCase() === "h") {
+				setShowSetHistory(prev => !prev);
+			} else if (e.key.toLowerCase() === "n") {
+				setShowLowerThird(prev => !prev);
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
 
 	const params = new URLSearchParams(window.location.search);
 	const transparent = params.get("transparent") !== "false";
@@ -63,7 +80,14 @@ export function StreamOverlay() {
 
 			{/* Score Bug -- compact top-left widget; hide when match has ended */}
 			{hasActiveMatch && matchStatus !== "completed" && (
-				<ScoreBug team1={team1} team2={team2} score={score} tournamentName={matchLabel} challenge={challenge} />
+				<ScoreBug
+					team1={team1}
+					team2={team2}
+					score={score}
+					tournamentName={matchLabel}
+					challenge={challenge}
+					showHistory={showSetHistory}
+				/>
 			)}
 
 			{/* Stats Widget -- rotating stat cards on the right side */}
@@ -78,7 +102,7 @@ export function StreamOverlay() {
 			)}
 
 			{/* Lower Third -- info ticker at the bottom */}
-			{hasActiveMatch && (
+			{hasActiveMatch && showLowerThird && (
 				<LowerThird
 					tournament={tournament}
 					teams={teams}
