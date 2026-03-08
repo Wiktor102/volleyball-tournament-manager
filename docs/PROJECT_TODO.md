@@ -442,7 +442,7 @@ Completed:
 26. ✅ Scoring rules rework — `TournamentSetup`
     - Added `tiebreakByTotalPoints` option to `ScoringSettings` type (frontend store + server service)
     - New preset-based scoring UI in `TournamentSetup` (`ScoringPresetSelector` + `RoundOverridesEditor` components)
-    - Presets: "2 sety po 11 pkt (punkty decydują)", "Do 2 setów po 15 pkt", "Do 2 setów po 25 pkt", "Na czas", "Własny"
+    - Presets: "2 sety po 15 pkt (punkty decydują)", "Do 2 setów po 15 pkt", "Do 2 setów po 25 pkt", "Na czas", "Własny"
     - `RoundOverridesEditor` fully rewrites the per-round override form with the same preset cards
     - Scoring preset cards CSS added to `admin.css`
 27. ✅ `tiebreakByTotalPoints` logic in `match.service.ts` `incrementPoint`

@@ -26,13 +26,13 @@ type ScoringPreset = {
 const SCORING_PRESETS: ScoringPreset[] = [
 	{
 		id: "fixed2x11_totalpoints",
-		name: "2 sety po 11 pkt (punkty decydują)",
+		name: "2 sety po 15 pkt (punkty decydują)",
 		description:
-			"Zawsze rozgrywane są 2 sety do 11 punktów. Przy wyniku 1:1 o awansie decyduje większa liczba łącznie zdobytych punktów. Jeśli punkty są remisowe – gra się na przewagę (pierwsze 2-punktowe prowadzenie).",
+			"Zawsze rozgrywane są 2 sety do 15 punktów. Przy wyniku 1:1 o awansie decyduje większa liczba łącznie zdobytych punktów. Jeśli punkty są remisowe – gra się na przewagę (pierwsze 2-punktowe prowadzenie).",
 		settings: {
 			mode: "sets",
 			setsToWin: 2,
-			pointsToWinSet: 11,
+			pointsToWinSet: 15,
 			pointsToWinTieBreak: 15,
 			mustWinByTwo: true,
 			tiebreakByTotalPoints: true

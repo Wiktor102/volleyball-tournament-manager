@@ -8,3 +8,4 @@ data/*.db*
 .playwright-cli
 nul
 tmpclaude-*
+.db-shm

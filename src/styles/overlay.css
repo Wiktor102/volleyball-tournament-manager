@@ -1388,7 +1388,7 @@ html, body, #root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #ef4444;
+  color: #c41919;
   margin-left: auto;
   padding-left: 12px;
 }
@@ -1397,7 +1397,7 @@ html, body, #root {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ef4444;
+  background: #c41919;
   animation: ov-pulse 1.5s ease-in-out infinite;
 }
 

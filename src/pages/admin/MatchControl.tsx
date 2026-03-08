@@ -52,6 +52,9 @@ export function MatchControl() {
 	const [manualT1, setManualT1] = useState(0);
 	const [manualT2, setManualT2] = useState(0);
 
+	// Swap sides in admin view only
+	const [swapped, setSwapped] = useState(false);
+
 	// Set score editing state
 	const [editingSetIndex, setEditingSetIndex] = useState<number | null>(null);
 	const [editSetT1, setEditSetT1] = useState(0);
@@ -254,12 +257,14 @@ export function MatchControl() {
 
 	const inc = (team: "team1" | "team2") => {
 		if (!socket || !matchId) return;
-		socket.emit("admin:score:increment", { matchId, team });
+		const actualTeam = swapped ? (team === "team1" ? "team2" : "team1") : team;
+		socket.emit("admin:score:increment", { matchId, team: actualTeam });
 	};
 
 	const dec = (team: "team1" | "team2") => {
 		if (!socket || !matchId) return;
-		socket.emit("admin:score:decrement", { matchId, team });
+		const actualTeam = swapped ? (team === "team1" ? "team2" : "team1") : team;
+		socket.emit("admin:score:decrement", { matchId, team: actualTeam });
 	};
 
 	const start = () => {
@@ -309,7 +314,8 @@ export function MatchControl() {
 
 	const awardSetToTeam = (team: "team1" | "team2") => {
 		if (!socket || !matchId) return;
-		socket.emit("admin:set:award", { matchId, team });
+		const actualTeam = swapped ? (team === "team1" ? "team2" : "team1") : team;
+		socket.emit("admin:set:award", { matchId, team: actualTeam });
 		addToast("Set przyznany", "success");
 	};
 
@@ -321,14 +327,16 @@ export function MatchControl() {
 
 	// Manual score input
 	const startEditingScore = () => {
-		setManualT1(score?.team1CurrentPoints ?? 0);
-		setManualT2(score?.team2CurrentPoints ?? 0);
+		setManualT1(swapped ? (score?.team2CurrentPoints ?? 0) : (score?.team1CurrentPoints ?? 0));
+		setManualT2(swapped ? (score?.team1CurrentPoints ?? 0) : (score?.team2CurrentPoints ?? 0));
 		setEditingScore(true);
 	};
 
 	const saveManualScore = () => {
 		if (!socket || !matchId) return;
-		socket.emit("admin:score:setDirect", { matchId, team1Points: manualT1, team2Points: manualT2 });
+		const team1Points = swapped ? manualT2 : manualT1;
+		const team2Points = swapped ? manualT1 : manualT2;
+		socket.emit("admin:score:setDirect", { matchId, team1Points, team2Points });
 		setEditingScore(false);
 		addToast("Wynik ustawiony ręcznie", "success");
 	};
@@ -340,14 +348,16 @@ export function MatchControl() {
 	// Set score editing
 	const startEditingSet = (index: number) => {
 		if (!score?.setScores?.[index]) return;
-		setEditSetT1(score.setScores[index].t1);
-		setEditSetT2(score.setScores[index].t2);
+		setEditSetT1(swapped ? score.setScores[index].t2 : score.setScores[index].t1);
+		setEditSetT2(swapped ? score.setScores[index].t1 : score.setScores[index].t2);
 		setEditingSetIndex(index);
 	};
 
 	const saveSetEdit = () => {
 		if (!socket || !matchId || editingSetIndex === null) return;
-		socket.emit("admin:set:edit", { matchId, setIndex: editingSetIndex, t1: editSetT1, t2: editSetT2 });
+		const t1Points = swapped ? editSetT2 : editSetT1;
+		const t2Points = swapped ? editSetT1 : editSetT2;
+		socket.emit("admin:set:edit", { matchId, setIndex: editingSetIndex, t1: t1Points, t2: t2Points });
 		setEditingSetIndex(null);
 		addToast("Wynik seta zaktualizowany", "success");
 	};
@@ -392,8 +402,8 @@ export function MatchControl() {
 	// Current set elapsed time (live counter)
 	const [currentSetElapsed, setCurrentSetElapsed] = useState("");
 
-	const t1 = teams.find(t => t.id === match?.team1Id);
-	const t2 = teams.find(t => t.id === match?.team2Id);
+	const t1 = teams.find(t => t.id === (swapped ? match?.team2Id : match?.team1Id));
+	const t2 = teams.find(t => t.id === (swapped ? match?.team1Id : match?.team2Id));
 
 	const canStart = match?.status === "pending" && !!match.team1Id && !!match.team2Id;
 	const canScore = match?.status === "live";
@@ -424,12 +434,13 @@ export function MatchControl() {
 			if (e.key === "l" || e.key === "L") inc("team2");
 			if (e.key === "q" || e.key === "Q") dec("team1");
 			if (e.key === "p" || e.key === "P") dec("team2");
+			if (e.key === "s" || e.key === "S") setSwapped(prev => !prev);
 		};
 
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [canScore, socket, matchId]);
+	}, [canScore, socket, matchId, swapped]);
 
 	if (!matchId) {
 		return (
@@ -473,7 +484,17 @@ export function MatchControl() {
 				) : (
 					<span className="text-muted">Kontrola meczu</span>
 				)}
-				{match && scoringMode !== "timed" && <div className="mc-info__right">Set: {score?.currentSet ?? 1}</div>}
+				<div className="mc-info__right">
+					{match && scoringMode !== "timed" && <span>Set: {score?.currentSet ?? 1}</span>}
+					<button
+						className={`btn btn-sm ${swapped ? "btn-primary" : "btn-secondary"}`}
+						style={{ marginLeft: "0.5rem", padding: "0 6px" }}
+						onClick={() => setSwapped(!swapped)}
+						title="Zmień strony (tylko widok admina)"
+					>
+						⇄
+					</button>
+				</div>
 			</div>
 
 			{/* ── Row 2: Sets display OR Timer ── */}
@@ -514,9 +535,13 @@ export function MatchControl() {
 						/* Sets score display */
 						<div className="mc-sets">
 							<div className="mc-sets__score">
-								<span style={{ color: t1?.color || undefined }}>{score?.team1Sets ?? 0}</span>
+								<span style={{ color: t1?.color || undefined }}>
+									{swapped ? (score?.team2Sets ?? 0) : (score?.team1Sets ?? 0)}
+								</span>
 								<span className="mc-sets__separator">:</span>
-								<span style={{ color: t2?.color || undefined }}>{score?.team2Sets ?? 0}</span>
+								<span style={{ color: t2?.color || undefined }}>
+									{swapped ? (score?.team1Sets ?? 0) : (score?.team2Sets ?? 0)}
+								</span>
 							</div>
 							<div className="mc-sets__label">Sety (do {score?.setsToWin ?? 3})</div>
 
@@ -561,7 +586,7 @@ export function MatchControl() {
 												onClick={() => canScore && startEditingSet(i)}
 												title={canScore ? "Kliknij, aby edytować wynik seta" : undefined}
 											>
-												S{i + 1}: {s.t1}-{s.t2}
+												S{i + 1}: {swapped ? s.t2 : s.t1}-{swapped ? s.t1 : s.t2}
 												{formatSetDuration(s.startedAt, s.endedAt) && (
 													<span className="text-dim" style={{ marginLeft: 4, fontSize: 10 }}>
 														({formatSetDuration(s.startedAt, s.endedAt)})
@@ -590,15 +615,16 @@ export function MatchControl() {
 									className={`info-message ${totalT1 === totalT2 ? "" : "info-message--success"}`}
 									style={{ marginTop: "0.75rem", textAlign: "center" }}
 								>
-									{totalT1 > totalT2 ? (
+									{Math.max(totalT1, totalT2) > Math.min(totalT1, totalT2) ? (
 										<>
-											<strong>🏆 {t1?.name ?? "Drużyna 1"} wygrywa</strong> na podstawie łącznych
-											punktów ({totalT1} : {totalT2}). Zatwierdź zwycięzcę.
-										</>
-									) : totalT2 > totalT1 ? (
-										<>
-											<strong>🏆 {t2?.name ?? "Drużyna 2"} wygrywa</strong> na podstawie łącznych
-											punktów ({totalT1} : {totalT2}). Zatwierdź zwycięzcę.
+											<strong>
+												🏆{" "}
+												{totalT1 > totalT2
+													? (teams.find(t => t.id === match.team1Id)?.name ?? "Drużyna 1")
+													: (teams.find(t => t.id === match.team2Id)?.name ?? "Drużyna 2")}{" "}
+												wygrywa
+											</strong>{" "}
+											na podstawie łącznych punktów ({totalT1} : {totalT2}). Zatwierdź zwycięzcę.
 										</>
 									) : (
 										<>
@@ -682,7 +708,9 @@ export function MatchControl() {
 							>
 								{teamLabel(t1)}
 							</div>
-							<div className="mc-score__value">{score?.team1CurrentPoints ?? 0}</div>
+							<div className="mc-score__value">
+								{swapped ? (score?.team2CurrentPoints ?? 0) : (score?.team1CurrentPoints ?? 0)}
+							</div>
 							<div className="mc-score__controls">
 								<button
 									className="btn btn-secondary mc-btn-score"
@@ -711,7 +739,9 @@ export function MatchControl() {
 							>
 								{teamLabel(t2)}
 							</div>
-							<div className="mc-score__value">{score?.team2CurrentPoints ?? 0}</div>
+							<div className="mc-score__value">
+								{swapped ? (score?.team1CurrentPoints ?? 0) : (score?.team2CurrentPoints ?? 0)}
+							</div>
 							<div className="mc-score__controls">
 								<button
 									className="btn btn-secondary mc-btn-score"
@@ -742,10 +772,10 @@ export function MatchControl() {
 					team2={t2 ? { id: t2.id, name: t2.name, color: t2.color } : undefined}
 					currentSet={score?.currentSet ?? 1}
 					scoreSnapshot={{
-						team1Points: score?.team1CurrentPoints ?? 0,
-						team2Points: score?.team2CurrentPoints ?? 0,
-						team1Sets: score?.team1Sets ?? 0,
-						team2Sets: score?.team2Sets ?? 0
+						team1Points: swapped ? (score?.team2CurrentPoints ?? 0) : (score?.team1CurrentPoints ?? 0),
+						team2Points: swapped ? (score?.team1CurrentPoints ?? 0) : (score?.team2CurrentPoints ?? 0),
+						team1Sets: swapped ? (score?.team2Sets ?? 0) : (score?.team1Sets ?? 0),
+						team2Sets: swapped ? (score?.team1Sets ?? 0) : (score?.team2Sets ?? 0)
 					}}
 					matchEventsEnabled={true}
 					playerStatsEnabled={false}
