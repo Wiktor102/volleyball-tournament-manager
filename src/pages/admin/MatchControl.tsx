@@ -522,14 +522,17 @@ export function MatchControl() {
 				)}
 				<div className="mc-info__right">
 					{match && scoringMode !== "timed" && <span>Set: {score?.currentSet ?? 1}</span>}
-					<button
-						className={`btn btn-sm ${swapped ? "btn-primary" : "btn-secondary"}`}
-						style={{ marginLeft: "0.5rem", padding: "0 6px" }}
-						onClick={() => setSwapped(!swapped)}
-						title="Zmień strony (tylko widok admina)"
-					>
-						⇄
-					</button>
+					<div className="mc-btn-container" style={{ marginLeft: "0.5rem" }}>
+						<button
+							className={`btn btn-sm ${swapped ? "btn-primary" : "btn-secondary"}`}
+							style={{ padding: "0 6px" }}
+							onClick={() => setSwapped(!swapped)}
+							title="Zmień strony (tylko widok admina)"
+						>
+							⇄
+						</button>
+						{canScore && <span className="mc-btn-shortcut">S</span>}
+					</div>
 				</div>
 			</div>
 
@@ -748,20 +751,26 @@ export function MatchControl() {
 								{swapped ? (score?.team2CurrentPoints ?? 0) : (score?.team1CurrentPoints ?? 0)}
 							</div>
 							<div className="mc-score__controls">
-								<button
-									className="btn btn-secondary mc-btn-score"
-									disabled={!canScore}
-									onClick={() => dec("team1")}
-								>
-									−
-								</button>
-								<button
-									className="btn btn-primary mc-btn-score"
-									disabled={!canScore}
-									onClick={() => inc("team1")}
-								>
-									+
-								</button>
+								<div className="mc-btn-container">
+									<button
+										className="btn btn-secondary mc-btn-score"
+										disabled={!canScore}
+										onClick={() => dec("team1")}
+									>
+										−
+									</button>
+									{canScore && <span className="mc-btn-shortcut">Q</span>}
+								</div>
+								<div className="mc-btn-container">
+									<button
+										className="btn btn-primary mc-btn-score"
+										disabled={!canScore}
+										onClick={() => inc("team1")}
+									>
+										+
+									</button>
+									{canScore && <span className="mc-btn-shortcut">A</span>}
+								</div>
 							</div>
 						</div>
 
@@ -779,20 +788,26 @@ export function MatchControl() {
 								{swapped ? (score?.team1CurrentPoints ?? 0) : (score?.team2CurrentPoints ?? 0)}
 							</div>
 							<div className="mc-score__controls">
-								<button
-									className="btn btn-secondary mc-btn-score"
-									disabled={!canScore}
-									onClick={() => dec("team2")}
-								>
-									−
-								</button>
-								<button
-									className="btn btn-primary mc-btn-score"
-									disabled={!canScore}
-									onClick={() => inc("team2")}
-								>
-									+
-								</button>
+								<div className="mc-btn-container">
+									<button
+										className="btn btn-secondary mc-btn-score"
+										disabled={!canScore}
+										onClick={() => dec("team2")}
+									>
+										−
+									</button>
+									{canScore && <span className="mc-btn-shortcut">P</span>}
+								</div>
+								<div className="mc-btn-container">
+									<button
+										className="btn btn-primary mc-btn-score"
+										disabled={!canScore}
+										onClick={() => inc("team2")}
+									>
+										+
+									</button>
+									{canScore && <span className="mc-btn-shortcut">L</span>}
+								</div>
 							</div>
 						</div>
 					</>
