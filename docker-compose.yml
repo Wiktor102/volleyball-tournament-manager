@@ -12,7 +12,7 @@ services:
       DB_FILE: /app/data/tournament.db
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
     volumes:
-      - volleyball_data:/app/data
+      - ./data:/app/data
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -21,6 +21,3 @@ services:
     depends_on:
       - app
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:?Set CF_TUNNEL_TOKEN in .env}
-
-volumes:
-  volleyball_data:
