@@ -2084,18 +2084,45 @@
 }
 
 .mc-info__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 12px;
   color: var(--color-text-dim);
   flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.mc-swap-state {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.mc-swap-state--active {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.08);
+  color: var(--color-text);
 }
 
 /* ---- Sets / Timer row (row 2) ---- */
 .mc-sets {
   display: flex;
   align-items: center;
+  flex-direction: column;
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.mc-sets__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .mc-sets__score {
@@ -2115,6 +2142,38 @@
 .mc-sets__label {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.mc-sets__legend {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mc-side-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.mc-side-pill__label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.mc-side-pill__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mc-sets__history {
@@ -2186,6 +2245,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mc-score__team-side {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
 }
 
 .mc-score__value {
@@ -2332,6 +2398,112 @@
   border-radius: var(--radius-sm);
 }
 
+.mc-set-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mc-set-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: inherit;
+}
+
+button.mc-set-row {
+  text-align: left;
+}
+
+.mc-set-row--clickable {
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.mc-set-row--clickable:hover {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.mc-set-row--editing {
+  background: var(--color-surface);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.mc-set-row__index {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.mc-set-row__scorebox,
+.mc-set-row__editor {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--color-surface);
+}
+
+.mc-set-row__scorebox.is-winner {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.mc-set-row__team-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mc-set-row__points {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.mc-set-row__separator {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-dim);
+}
+
+.mc-set-row__meta {
+  min-width: 38px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.mc-set-row__editor input {
+  width: 100%;
+}
+
+.mc-set-row__editor--right {
+  text-align: right;
+}
+
+.mc-set-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 /* ---- Portrait mode (narrow tablet) ---- */
 @media (max-width: 700px) {
   .admin-container--match-control {
@@ -2360,6 +2532,21 @@
 
   .mc-score__team-name {
     font-size: clamp(14px, 4vw, 18px);
+  }
+
+  .mc-sets__legend,
+  .mc-set-row,
+  .mc-set-row--editing {
+    grid-template-columns: 1fr;
+  }
+
+  .mc-set-row__separator,
+  .mc-set-row__meta {
+    display: none;
+  }
+
+  .mc-set-row__actions {
+    justify-content: flex-start;
   }
 }
 
