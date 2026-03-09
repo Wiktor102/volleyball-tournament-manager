@@ -12,8 +12,9 @@ export type ScoringSettings = {
 	/**
 	 * When true and sets are tied (both teams have setsToWin-1 sets), instead of
 	 * playing a standard tiebreak set the winner is determined by total points
-	 * accumulated across all previous sets.  If total points are also equal,
-	 * an "advantage" set is played (first to score with mustWinByTwo lead).
+	 * accumulated across all previous sets. Regular sets still end exactly on the
+	 * configured point target. If total points are also equal, the last regular
+	 * set continues into an attached advantage phase.
 	 */
 	tiebreakByTotalPoints?: boolean;
 	// Timed mode settings

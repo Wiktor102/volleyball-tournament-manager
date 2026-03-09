@@ -499,7 +499,9 @@ export async function incrementPoint(matchId: string, team: "team1" | "team2") {
 			? (config?.pointsToWinTieBreak ?? 15)
 			: (config?.pointsToWinSet ?? 25);
 
-	const minAdvantage = config?.mustWinByTwo ? 2 : 1;
+	// In total-points mode the target point ends each regular set immediately.
+	// Only the tied-total continuation on the final regular set uses advantage play.
+	const minAdvantage = tiebreakByTotalPoints && !isAdvantageSet ? 1 : config?.mustWinByTwo ? 2 : 1;
 
 	let t1Points = score.team1CurrentPoints + (team === "team1" ? 1 : 0);
 	let t2Points = score.team2CurrentPoints + (team === "team2" ? 1 : 0);

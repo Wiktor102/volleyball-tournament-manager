@@ -793,8 +793,8 @@ export function MatchControl() {
 										</>
 									) : (
 										<>
-											<strong>⚡ Remis punktowy</strong> ({totalT1} : {totalT2}) – gramy na przewagę do
-											wyłonienia zwycięzcy!
+											<strong>⚡ Remis punktowy</strong> ({totalT1} : {totalT2}) – drugi set przechodzi
+											na przewagę do wyłonienia zwycięzcy!
 										</>
 									)}
 								</div>

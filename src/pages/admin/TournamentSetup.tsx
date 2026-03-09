@@ -28,7 +28,7 @@ const SCORING_PRESETS: ScoringPreset[] = [
 		id: "fixed2x11_totalpoints",
 		name: "2 sety po 15 pkt (punkty decydują)",
 		description:
-			"Zawsze rozgrywane są 2 sety do 15 punktów. Przy wyniku 1:1 o awansie decyduje większa liczba łącznie zdobytych punktów. Jeśli punkty są remisowe – gra się na przewagę (pierwsze 2-punktowe prowadzenie).",
+			"Zawsze rozgrywane są 2 sety do 15 punktów, bez przewag w secie regularnym: 15. punkt kończy seta. Przy wyniku 1:1 o awansie decyduje większa liczba łącznie zdobytych punktów. Jeśli suma punktów po 2 setach jest remisowa, drugi set przechodzi na przewagę.",
 		settings: {
 			mode: "sets",
 			setsToWin: 2,
@@ -238,7 +238,7 @@ function ScoringPresetSelector({
 									</div>
 									<span className="text-muted text-sm" style={{ marginTop: "0.25rem", display: "block" }}>
 										{value.tiebreakByTotalPoints
-											? "Przy remisie setów: wygrywa drużyna z większą łączną liczbą punktów. Jeśli punkty równe – gra na przewagę."
+											? "Przy remisie setów: wygrywa drużyna z większą łączną liczbą punktów. Regularne sety kończą się po zdobyciu wymaganego punktu; tylko przy równych punktach łącznych ostatni set przechodzi na przewagę."
 											: "Przy remisie setów: rozgrywany jest decydujący (tie-break) set."}
 									</span>
 								</div>
