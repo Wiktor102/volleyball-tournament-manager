@@ -3,9 +3,9 @@ node_modules
 dist
 *.log
 .env
-data/*.db*
 *.tsbuildinfo
 .playwright-cli
 nul
 tmpclaude-*
-.db-shm
+
+/data
