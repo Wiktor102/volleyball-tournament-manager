@@ -7,7 +7,8 @@ const FULLSCREEN_OVERLAY_MAX_MS = 30_000;
 
 interface CelebrationOverlayProps {
 	matchId: string;
-	teams: Team[];
+	team1: Team | undefined;
+	team2: Team | undefined;
 }
 
 type CelebrationState = {
@@ -104,7 +105,7 @@ function generateParticles(count: number, color: string) {
 	return particles;
 }
 
-export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) {
+export function CelebrationOverlay({ matchId, team1, team2 }: CelebrationOverlayProps) {
 	const { socket } = useSocket();
 	const [celebration, setCelebration] = useState<CelebrationState>(null);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,14 +174,12 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 
 			if (prev) {
 				if (t1Sets > prev.team1Sets && !enteringAdvantageStage) {
-					const team = teams.find(t => t.id === s.team1Id);
-					triggerCelebration(team?.name ?? "Druzyna 1", team?.color ?? "#FFD23F", "set", 3000, {
+					triggerCelebration(team1?.name ?? "Drużyna 1", team1?.color ?? "#FFD23F", "set", 3000, {
 						t1: t1Sets,
 						t2: t2Sets
 					});
 				} else if (t2Sets > prev.team2Sets && !enteringAdvantageStage) {
-					const team = teams.find(t => t.id === s.team2Id);
-					triggerCelebration(team?.name ?? "Druzyna 2", team?.color ?? "#FFD23F", "set", 3000, {
+					triggerCelebration(team2?.name ?? "Drużyna 2", team2?.color ?? "#FFD23F", "set", 3000, {
 						t1: t1Sets,
 						t2: t2Sets
 					});
@@ -203,7 +202,7 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 				if (lastCompletedMatchRef.current === completedKey) return;
 				lastCompletedMatchRef.current = completedKey;
 
-				const team = teams.find(t => t.id === m.winnerId);
+				const team = m.winnerId === team1?.id ? team1 : m.winnerId === team2?.id ? team2 : undefined;
 				triggerCelebration(team?.name ?? "Zwyciezca", team?.color ?? "#FFD23F", "match", MATCH_WIN_DURATION_MS);
 			}
 		};
@@ -217,7 +216,7 @@ export function CelebrationOverlay({ matchId, teams }: CelebrationOverlayProps) 
 			// Do NOT clear celebration timers here — this effect re-runs whenever
 			// `teams` updates (socket data), which would cancel active dismiss timers.
 		};
-	}, [socket, matchId, teams]);
+	}, [socket, matchId, team1, team2]);
 
 	// Separate cleanup: only cancel timers when the component unmounts.
 	useEffect(() => {

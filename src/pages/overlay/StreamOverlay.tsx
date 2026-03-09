@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTournamentDisplay } from "../../hooks/useTournamentDisplay";
 import { ScoreBug } from "../../components/overlay/ScoreBug";
 import { EventBlast } from "../../components/overlay/EventBlast";
@@ -7,6 +7,8 @@ import { CelebrationOverlay } from "../../components/overlay/CelebrationOverlayN
 import { ChallengeOverlay } from "../../components/overlay/ChallengeOverlay";
 import { StatsWidget } from "../../components/overlay/StatsWidget";
 import "../../styles/overlay.css";
+
+const MATCH_CELEBRATION_HOLD_MS = 30_600;
 
 export function StreamOverlay() {
 	const {
@@ -25,6 +27,12 @@ export function StreamOverlay() {
 
 	const [showSetHistory, setShowSetHistory] = useState(true);
 	const [showLowerThird, setShowLowerThird] = useState(true);
+	const [celebrationMatch, setCelebrationMatch] = useState<{
+		id: string;
+		team1Id: string | null;
+		team2Id: string | null;
+	} | null>(null);
+	const celebrationHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,13 +47,53 @@ export function StreamOverlay() {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, []);
 
+	useEffect(() => {
+		if (!currentMatch?.id) return;
+
+		setCelebrationMatch({
+			id: currentMatch.id,
+			team1Id: currentMatch.team1Id,
+			team2Id: currentMatch.team2Id
+		});
+	}, [currentMatch?.id, currentMatch?.team1Id, currentMatch?.team2Id]);
+
+	useEffect(() => {
+		if (celebrationHoldTimerRef.current) {
+			clearTimeout(celebrationHoldTimerRef.current);
+			celebrationHoldTimerRef.current = null;
+		}
+
+		if (currentMatch?.id) return;
+
+		if (celebrationMatch?.id) {
+			celebrationHoldTimerRef.current = setTimeout(() => {
+				setCelebrationMatch(null);
+				celebrationHoldTimerRef.current = null;
+			}, MATCH_CELEBRATION_HOLD_MS);
+			return;
+		}
+
+		setCelebrationMatch(null);
+	}, [currentMatch?.id, celebrationMatch?.id]);
+
+	useEffect(() => {
+		return () => {
+			if (celebrationHoldTimerRef.current) {
+				clearTimeout(celebrationHoldTimerRef.current);
+			}
+		};
+	}, []);
+
 	const params = new URLSearchParams(window.location.search);
 	const transparent = params.get("transparent") !== "false";
 
 	const team1 = teams.find(t => t.id === currentMatch?.team1Id);
 	const team2 = teams.find(t => t.id === currentMatch?.team2Id);
+	const celebrationTeam1 = teams.find(t => t.id === celebrationMatch?.team1Id);
+	const celebrationTeam2 = teams.find(t => t.id === celebrationMatch?.team2Id);
 
 	const hasActiveMatch = !!currentMatch?.id && !!currentMatch?.team1Id && !!currentMatch?.team2Id;
+	const hasCelebrationMatch = !!celebrationMatch?.id && !!celebrationMatch?.team1Id && !!celebrationMatch?.team2Id;
 
 	const matchLabel = tournament?.name || "";
 
@@ -70,7 +118,9 @@ export function StreamOverlay() {
 			)}
 
 			{/* Celebration overlay -- fullscreen takeover for set/match wins */}
-			{hasActiveMatch && currentMatch?.id && <CelebrationOverlay matchId={currentMatch.id} teams={teams} />}
+			{hasCelebrationMatch && celebrationMatch?.id && (
+				<CelebrationOverlay matchId={celebrationMatch.id} team1={celebrationTeam1} team2={celebrationTeam2} />
+			)}
 
 			{/* Challenge overlay -- fullscreen dramatic challenge/VAR animation */}
 			{hasActiveMatch && challenge && <ChallengeOverlay challenge={challenge} team1={team1} team2={team2} />}
