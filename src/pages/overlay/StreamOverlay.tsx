@@ -19,6 +19,7 @@ export function StreamOverlay() {
 		score,
 		challenge,
 		nextMatch,
+		ballsOnBalcony,
 		completedMatches,
 		totalMatches,
 		recentMatches,
@@ -157,6 +158,7 @@ export function StreamOverlay() {
 					tournament={tournament}
 					teams={teams}
 					nextMatch={nextMatch}
+					ballsOnBalcony={ballsOnBalcony}
 					completedMatches={completedMatches}
 					totalMatches={totalMatches}
 					recentMatches={recentMatches ?? []}

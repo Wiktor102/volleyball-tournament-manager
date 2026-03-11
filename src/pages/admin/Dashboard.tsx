@@ -24,12 +24,14 @@ type BracketMatch = {
 
 export function Dashboard() {
 	const { socket, onReconnect } = useSocket();
-	const { tournament, teams, setTournament, setTeams } = useTournamentStore();
+	const { tournament, teams, ballsOnBalcony, setTournament, setTeams, setBallsOnBalcony } = useTournamentStore();
 	const { setMatchId, setMatchTeams, setScore } = useMatchStore();
 	const { addToast } = useToast();
 	const [tournamentName, setTournamentName] = useState("");
+	const [ballsOnBalconyInput, setBallsOnBalconyInput] = useState("0");
 	const [bracket, setBracket] = useState<BracketMatch[]>([]);
 	const [saving, setSaving] = useState(false);
+	const [savingBallsOnBalcony, setSavingBallsOnBalcony] = useState(false);
 	const [loaded, setLoaded] = useState(false);
 	const [kebabOpen, setKebabOpen] = useState(false);
 	const kebabRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,7 @@ export function Dashboard() {
 			setTournament(state.tournament);
 			setTournamentName(state.tournament.name);
 			setTeams(state.teams);
+			setBallsOnBalcony(state.ballsOnBalcony ?? 0);
 			if (state.currentMatch?.id) {
 				setMatchId(state.currentMatch.id);
 				setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null);
@@ -101,7 +104,11 @@ export function Dashboard() {
 			socket.off("bracket:updated", onBracket);
 			socket.off("tournament:status:changed", onStatusChanged);
 		};
-	}, [socket, setTournament, setTeams, setScore, setMatchId, setMatchTeams, addToast]);
+	}, [socket, setTournament, setTeams, setBallsOnBalcony, setScore, setMatchId, setMatchTeams, addToast]);
+
+	useEffect(() => {
+		setBallsOnBalconyInput(String(ballsOnBalcony));
+	}, [ballsOnBalcony]);
 
 	useEffect(() => {
 		if (!socket || !tournament) return;
@@ -115,6 +122,30 @@ export function Dashboard() {
 		setSaving(true);
 		socket.emit("admin:tournament:update", { tournamentId: tournament.id, patch: { name: tournamentName.trim() } }, () =>
 			setSaving(false)
+		);
+	};
+
+	const saveBallsOnBalcony = () => {
+		if (!socket || !tournament) return;
+		const nextValue = Number.parseInt(ballsOnBalconyInput, 10);
+		if (!Number.isFinite(nextValue) || nextValue < 0) {
+			addToast("Podaj liczbę całkowitą większą lub równą 0", "error");
+			return;
+		}
+
+		setSavingBallsOnBalcony(true);
+		socket.emit(
+			"admin:tournament:balls-on-balcony:set",
+			{ tournamentId: tournament.id, value: nextValue },
+			(ack: Ack<{ ballsOnBalcony: number }>) => {
+				setSavingBallsOnBalcony(false);
+				if (!ack.ok) {
+					addToast(ack.error, "error");
+					return;
+				}
+				setBallsOnBalcony(ack.data?.ballsOnBalcony ?? nextValue);
+				addToast("Licznik zaktualizowany", "success");
+			}
 		);
 	};
 
@@ -281,7 +312,7 @@ export function Dashboard() {
 			</div>
 
 			{/* Quick Stats */}
-			<div className="grid grid-3">
+			<div className="grid grid-4">
 				<div className="card">
 					<div className="card-header">
 						<h3>Drużyny</h3>
@@ -345,6 +376,46 @@ export function Dashboard() {
 							)}
 						</>
 					)}
+				</div>
+
+				<div className="card">
+					<div className="card-header">
+						<h3>Piłki na balkonie</h3>
+					</div>
+					<div style={{ fontSize: 48, fontWeight: 700, marginBottom: 12 }}>{ballsOnBalcony}</div>
+					<div className="form-row">
+						<div className="form-group mb-0" style={{ flex: 1 }}>
+							<label className="form-label">Nowa wartość</label>
+							<input
+								type="number"
+								min={0}
+								step={1}
+								className="form-input"
+								value={ballsOnBalconyInput}
+								onChange={e => setBallsOnBalconyInput(e.target.value)}
+								onKeyDown={e => {
+									if (e.key === "Enter") saveBallsOnBalcony();
+								}}
+							/>
+						</div>
+						<div className="form-group mb-0" style={{ flex: 0 }}>
+							<label className="form-label">&nbsp;</label>
+							<button
+								className="btn btn-primary btn-sm"
+								onClick={saveBallsOnBalcony}
+								disabled={
+									savingBallsOnBalcony ||
+									ballsOnBalconyInput.trim() === "" ||
+									Number.parseInt(ballsOnBalconyInput, 10) === ballsOnBalcony
+								}
+							>
+								{savingBallsOnBalcony ? "Zapisywanie..." : "Ustaw"}
+							</button>
+						</div>
+					</div>
+					<div className="text-muted mb-1" style={{ fontSize: 13 }}>
+						Wartość zapisuje się poza bazą i pojawia się od razu w nakładce OBS.
+					</div>
 				</div>
 			</div>
 

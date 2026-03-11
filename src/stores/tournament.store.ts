@@ -71,6 +71,7 @@ export type MatchSummary = {
 export type TournamentState = {
 	tournament: Tournament;
 	teams: Team[];
+	ballsOnBalcony: number;
 	currentMatch: { id: string; team1Id: string | null; team2Id: string | null } | null;
 	score: unknown | null;
 	upcomingMatches?: MatchSummary[];
@@ -83,6 +84,7 @@ export type TournamentState = {
 type State = {
 	tournament: Tournament | null;
 	teams: Team[];
+	ballsOnBalcony: number;
 	upcomingMatches: MatchSummary[];
 	recentMatches: MatchSummary[];
 	nextMatch: MatchSummary | null;
@@ -90,6 +92,7 @@ type State = {
 	completedMatches: number;
 	setTournament: (t: Tournament) => void;
 	setTeams: (t: Team[]) => void;
+	setBallsOnBalcony: (value: number) => void;
 	setUpcomingMatches: (matches: MatchSummary[]) => void;
 	setRecentMatches: (matches: MatchSummary[]) => void;
 	setNextMatch: (match: MatchSummary | null) => void;
@@ -100,6 +103,7 @@ type State = {
 export const useTournamentStore = create<State>(set => ({
 	tournament: null,
 	teams: [],
+	ballsOnBalcony: 0,
 	upcomingMatches: [],
 	recentMatches: [],
 	nextMatch: null,
@@ -107,6 +111,7 @@ export const useTournamentStore = create<State>(set => ({
 	completedMatches: 0,
 	setTournament: t => set({ tournament: t }),
 	setTeams: teams => set({ teams }),
+	setBallsOnBalcony: ballsOnBalcony => set({ ballsOnBalcony }),
 	setUpcomingMatches: upcomingMatches => set({ upcomingMatches }),
 	setRecentMatches: recentMatches => set({ recentMatches }),
 	setNextMatch: nextMatch => set({ nextMatch }),

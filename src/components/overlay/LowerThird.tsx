@@ -5,6 +5,7 @@ interface LowerThirdProps {
 	tournament: { name: string } | null;
 	teams: Team[];
 	nextMatch: MatchSummary | null;
+	ballsOnBalcony: number;
 	completedMatches: number;
 	totalMatches: number;
 	recentMatches: MatchSummary[];
@@ -40,6 +41,7 @@ export function LowerThird({
 	tournament,
 	teams,
 	nextMatch,
+	ballsOnBalcony,
 	completedMatches,
 	totalMatches,
 	recentMatches,
@@ -49,6 +51,7 @@ export function LowerThird({
 	const panels = buildPanels({
 		teams,
 		nextMatch,
+		ballsOnBalcony,
 		completedMatches,
 		totalMatches,
 		recentMatches,
@@ -104,12 +107,13 @@ export function LowerThird({
 function buildPanels(props: {
 	teams: Team[];
 	nextMatch: MatchSummary | null;
+	ballsOnBalcony: number;
 	completedMatches: number;
 	totalMatches: number;
 	recentMatches: MatchSummary[];
 	tournamentName?: string;
 }): PanelData[] {
-	const { teams, nextMatch, completedMatches, totalMatches, recentMatches, tournamentName } = props;
+	const { teams, nextMatch, ballsOnBalcony, completedMatches, totalMatches, recentMatches, tournamentName } = props;
 	const panels: PanelData[] = [];
 
 	// Panel: Next match
@@ -158,6 +162,16 @@ function buildPanels(props: {
 			)
 		});
 	}
+
+	panels.push({
+		id: "balls-on-balcony",
+		tag: "Stat",
+		content: (
+			<span className="ov-lower-third__text">
+				Piłki na balkonie: <strong>{ballsOnBalcony}</strong>
+			</span>
+		)
+	});
 
 	// Panel: Last completed match result
 	const lastCompleted = recentMatches.find(m => m.status === "completed" && m.winnerId);

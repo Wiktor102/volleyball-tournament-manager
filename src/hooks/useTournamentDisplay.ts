@@ -23,10 +23,12 @@ export function useTournamentDisplay() {
 		upcomingMatches,
 		recentMatches,
 		nextMatch,
+		ballsOnBalcony,
 		totalMatches,
 		completedMatches,
 		setTournament,
 		setTeams,
+		setBallsOnBalcony,
 		setUpcomingMatches,
 		setRecentMatches,
 		setNextMatch,
@@ -75,6 +77,7 @@ export function useTournamentDisplay() {
 		const onState = (state: TournamentState) => {
 			setTournament(state.tournament);
 			setTeams(state.teams);
+			setBallsOnBalcony(state.ballsOnBalcony ?? 0);
 			if (state.currentMatch?.id) {
 				setMatchId(state.currentMatch.id);
 				setMatchTeams(state.currentMatch.team1Id ?? null, state.currentMatch.team2Id ?? null);
@@ -146,6 +149,7 @@ export function useTournamentDisplay() {
 		socket,
 		setTournament,
 		setTeams,
+		setBallsOnBalcony,
 		setMatchId,
 		setMatchTeams,
 		setScore,
@@ -178,6 +182,7 @@ export function useTournamentDisplay() {
 		matchStatus,
 		score,
 		challenge,
+		ballsOnBalcony,
 		upcomingMatches,
 		recentMatches,
 		nextMatch: nextMatch as MatchSummary | null,

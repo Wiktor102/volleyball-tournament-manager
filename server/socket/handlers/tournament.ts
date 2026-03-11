@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io";
-import { CreateTournamentSchema, JoinTournamentSchema } from "../../utils/validation";
+import { CreateTournamentSchema, JoinTournamentSchema, SetBallsOnBalconySchema } from "../../utils/validation";
 import { getTournamentState } from "../../services/state.service";
+import { deleteTournamentRuntimeState, setTournamentBallsOnBalcony } from "../../services/runtime-state.service";
 import {
 	createTournament,
 	deleteTournament,
@@ -61,14 +62,14 @@ export function registerTournamentHandlers(io: Server, socket: Socket) {
 			io.to(`tournament:${updated.id}`).emit("tournament:status:changed", {
 				tournamentId: updated.id,
 				oldStatus: old.status,
-				newStatus: updated.status,
+				newStatus: updated.status
 			});
 			io.to(`tournament:${updated.id}`).emit("tournament:admin:notification", {
 				tournamentId: updated.id,
 				type: "status:changed",
 				message: `Turniej zmienił status na: ${updated.status}`,
 				oldStatus: old.status,
-				newStatus: updated.status,
+				newStatus: updated.status
 			});
 		}
 
@@ -76,7 +77,7 @@ export function registerTournamentHandlers(io: Server, socket: Socket) {
 		if (JSON.stringify(old.settings) !== JSON.stringify(updated.settings)) {
 			io.to(`tournament:${updated.id}`).emit("tournament:settings:changed", {
 				tournamentId: updated.id,
-				settings: updated.settings,
+				settings: updated.settings
 			});
 		}
 
@@ -93,10 +94,25 @@ export function registerTournamentHandlers(io: Server, socket: Socket) {
 
 		const deleted = await deleteTournament(tournamentId);
 		if (!deleted) return ack?.({ ok: false, error: "Nie znaleziono turnieju" });
+		await deleteTournamentRuntimeState(tournamentId);
 
 		io.emit("tournament:deleted", { tournamentId });
 		io.emit("tournament:list:updated");
 		return ack?.({ ok: true });
+	});
+
+	socket.on("admin:tournament:balls-on-balcony:set", async (payload, ack) => {
+		const parsed = SetBallsOnBalconySchema.safeParse(payload);
+		if (!parsed.success) return ack?.({ ok: false, error: "Nieprawidłowe dane" });
+
+		const tournament = await getTournament(parsed.data.tournamentId);
+		if (!tournament) return ack?.({ ok: false, error: "Nie znaleziono turnieju" });
+
+		const runtimeState = await setTournamentBallsOnBalcony(parsed.data.tournamentId, parsed.data.value);
+		const state = await getTournamentState(parsed.data.tournamentId);
+		if (state) io.to(`tournament:${parsed.data.tournamentId}`).emit("tournament:state", state);
+
+		return ack?.({ ok: true, data: runtimeState });
 	});
 
 	socket.on("tournament:default", async (_payload, ack) => {

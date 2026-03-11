@@ -11,6 +11,11 @@ export const JoinTournamentSchema = z.object({
 	tournamentId: z.string().min(1)
 });
 
+export const SetBallsOnBalconySchema = z.object({
+	tournamentId: z.string().min(1),
+	value: z.number().int().min(0)
+});
+
 export const CreateTeamSchema = z.object({
 	tournamentId: z.string().min(1),
 	name: z.string().min(1),
